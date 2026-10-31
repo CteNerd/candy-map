@@ -30,9 +30,8 @@ unfinished acceptance criteria" at the bottom — nothing is silently dropped.
       violated "every write checks authorization server-side" and "prevent duplicate neighborhood
       creation." It landed once both were ready: authenticated in Milestone 3, overlap-dedupe in
       Milestone 4.
-- [x] Web app fetches from the real public API instead of static fixtures (adapter-based, so it
-      still falls back to fixtures if API is unreachable) — already supported by `lib/api.ts`
-      (Milestone 1); set `VITE_API_BASE_URL` once the stack is deployed to switch over
+- [x] Web app fetches from the real public API when configured; fixtures are local-only.
+      Live API failures surface visibly instead of showing synthetic houses.
 - [x] Unit tests for Lambda handlers (mocked DynamoDB via `aws-sdk-client-mock`, 6 passing)
 
 ## Milestone 3 — Auth, claims, candy toggle
@@ -60,8 +59,8 @@ unfinished acceptance criteria" at the bottom — nothing is silently dropped.
 - [x] API throttling (API Gateway default stage, 20 rps / 40 burst) / per-account-per-house rate
       limiting (DynamoDB conditional-write windows on both claims and reports)
 - [x] Share-link for a neighborhood (`?lat=&lon=` deep link + "Share" button, copies to clipboard)
-- [ ] Mobile QA pass — not performed; see README "Known limitations" (no real device/viewport lab
-      available in this session; only desktop browser automation was used)
+- [ ] Full mobile QA pass — 390x844 browser layout/worker/sign-in-redirect smoke checks passed;
+      real-device resident/organizer workflows remain unverified.
 - [ ] QR code image generation — deliberately **not** implemented: would require either a
       client-side QR library (fine) or an external QR image API (a third-party data-sharing
       concern for no real benefit over the share link). The share link itself satisfies the
@@ -70,6 +69,14 @@ unfinished acceptance criteria" at the bottom — nothing is silently dropped.
 - [x] Additional tests: conditional-write race (resolveHouse, Milestone 3), claim conflicts
       (submitClaim, Milestone 3), duplicate-neighborhood reservation + overlap (createNeighborhood,
       this milestone), public response shape (PII-free projections, Milestone 2)
+
+## Deployment follow-up
+- [x] Private S3 + CloudFront hosting, SPA routes, automatic CORS and Cognito callback origin
+- [x] Scoped local assume-role profile, isolated bootstrap, bounded CloudFormation and runtime IAM
+- [x] Generated API/Cognito/CloudFront permissions tightened after creation
+- [x] Live app deployment and HTTP smoke checks using project permissions
+- [x] GitHub production environment restricted to main; OIDC workflow and environment variables
+- [x] Clean shared-first build order, real Lambda bundle-load regression tests, explicit map worker
 
 ## Known gaps / unfinished acceptance criteria
 _(This section is updated as implementation proceeds; see bottom of README for final status.)_
@@ -82,6 +89,6 @@ _(This section is updated as implementation proceeds; see bottom of README for f
   geocoding the street address itself (Amazon Location Service place search was deferred per the
   plan's Hour-1 guidance to use a mock adapter if setup would delay the POC). The resident
   dashboard and Find/Join screen both expose raw lat/lon inputs as a stand-in.
-- **No deployment has been run.** This session has no AWS credentials, so everything below CDK
-  `synth`/unit tests (which run cleanly) has not been exercised against real AWS resources. See
-  README "Deployment steps" and "Manual smoke-test checklist".
+- **Deployment does not imply full acceptance verification.** See README "Deployment" and
+  "Manual smoke-test checklist" for infrastructure smoke checks versus remaining real-user QA.
+  The deployed database starts empty; an authenticated organizer must create the first neighborhood.

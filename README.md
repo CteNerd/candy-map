@@ -22,50 +22,100 @@ Single-table DynamoDB design — see
 [`services/api/src/lib/table.ts`](./services/api/src/lib/table.ts) for the full key schema and the
 `gsi1` access patterns ("houses by neighborhood", "claims by user").
 
-## Deployment steps
+## Deployment
 
-Requires an AWS account, the AWS CLI configured with credentials, and (once, per
-account+region) `cdk bootstrap`.
+- Live app: [Candy Map](https://d20cdlbs8tmt1h.cloudfront.net)
+- Repository: [CteNerd/candy-map](https://github.com/CteNerd/candy-map)
+- Deployment region: `us-east-1`.
 
-```bash
-# 1. Install dependencies and build the shared package (infra bundling needs its dist/ output)
-npm install
-npm run build --workspace packages/shared
+Requires Node 22+, npm, AWS CLI v2, and an existing AWS GitHub OIDC provider
+(`token.actions.githubusercontent.com`, audience `sts.amazonaws.com`). All commands below
+run from the repository root. No AWS access keys are stored in GitHub.
 
-# 2. One-time per AWS account/region
-npx cdk bootstrap --app "npx ts-node --prefer-ts-exts infrastructure/bin/candy-map.ts"
-# (or: cd infrastructure && npx cdk bootstrap)
+### One-time privileged setup
 
-# 3. Deploy — a real deployment MUST override both of these:
-cd infrastructure
-npx cdk deploy \
-  --context allowedOrigin=https://your-deployed-web-origin \
-  --context cognitoDomainPrefix=your-globally-unique-prefix
-
-# 4. Note the stack outputs: ApiUrl, UserPoolId, UserPoolClientId, CognitoHostedUiDomain, TableName
-```
-
-Then configure the web app and deploy it (any static host — S3+CloudFront, Amplify Hosting, or
-just `vercel`/`netlify` for the POC):
+Use the approved setup profile only to provision `CandyMapDeployment`; do **not** run the
+standard `cdk bootstrap`, which defaults to AdministratorAccess for CloudFormation.
+Our isolated bootstrap creates an asset bucket, version parameter, four deployment roles,
+and three project policies. It does not modify the account's existing CDKToolkit, OIDC provider,
+users, credentials, or other apps.
+It supports this app's file assets only, not arbitrary CDK/container deployments. CDK's generic
+"bootstrap outdated" notice refers to its version-6 compatibility parameter; do not replace it
+with an administrator-backed default bootstrap to silence that notice.
 
 ```bash
-cd apps/web
-cp .env.example .env.local
-# Fill in VITE_API_BASE_URL (ApiUrl), VITE_COGNITO_DOMAIN (CognitoHostedUiDomain),
-# VITE_COGNITO_CLIENT_ID (UserPoolClientId) from the stack outputs above.
-npm run build
-# deploy dist/ to your static host of choice
+npm ci
+AWS_ACCOUNT_ID=YOUR_ACCOUNT AWS_REGION=us-east-1 \
+  GITHUB_REPOSITORY=OWNER/REPO node scripts/setup-deployment.mjs
+
+aws configure set role_arn arn:aws:iam::YOUR_ACCOUNT:role/candy-map/deployment/candy-map-local-deploy --profile candy-map
+aws configure set source_profile default --profile candy-map
+aws configure set region us-east-1 --profile candy-map
+AWS_PROFILE=candy-map aws sts get-caller-identity
 ```
 
-**Important:** `allowedOrigin` and the web app's deployed URL must match exactly (including
-scheme), or Cognito will reject the OAuth callback and CORS will block API calls. Local dev
-(`http://localhost:5173`) is always included as a fallback callback URL regardless of
-`allowedOrigin`, so `npm run dev` works without a context override.
+If setup uses a different source profile, set `source_profile` accordingly. The source identity
+must be able to assume the new local role. Existing admin permissions on that source remain
+unchanged; the `candy-map` sessions themselves use only project permissions. For eliminating
+stored admin credentials altogether, migrate the source to IAM Identity Center separately.
 
-To seed the one demo neighborhood for a smoke test, call `POST /neighborhoods` (authenticated —
-sign in via the Hosted UI first) with a small polygon, then `POST /houses/resolve` +
-`POST /houses/claims` + `PATCH /houses/{id}/candy` as that same user. There is no seed script in
-this POC; see "Known limitations" below.
+### Deploy with project permissions
+
+```bash
+AWS_PROFILE=candy-map AWS_REGION=us-east-1 npm run deploy
+```
+
+`npm run deploy` defaults to the `candy-map` profile when no credentials/profile are supplied,
+and rejects administrator identities even if they are explicitly selected.
+
+This builds shared code first, deploys `CandyMapHosting` and `CandyMapStack`, reads CloudFormation
+outputs, builds the frontend with the public API/Cognito settings, publishes hashed assets before
+HTML, invalidates CloudFront, waits for invalidation, and checks live web/API responses.
+Previous hashed assets are retained so open tabs continue working during a release.
+
+The private S3 bucket is served through CloudFront HTTPS with SPA deep-link routing. Its origin
+is automatically used for API CORS and Cognito `/auth/callback`; no manual second deployment or
+wildcard CORS is needed. The Cognito domain prefix defaults to account+region. Local development
+still has a callback at `http://localhost:5173/auth/callback`; fill in the public variables in
+`apps/web/.env.local` from backend outputs to use the deployed API locally.
+
+After the first successful deployment, use the setup identity **once more** to restrict generated
+API, Cognito, distribution and origin-access-control IDs (instead of their initial wildcards):
+
+```bash
+AWS_ACCOUNT_ID=YOUR_ACCOUNT AWS_REGION=us-east-1 \
+  GITHUB_REPOSITORY=OWNER/REPO node scripts/setup-deployment.mjs --tighten
+```
+
+The scope values persist as CloudFormation parameters. Replacing any of these generated resources
+requires an intentional privileged setup change; ordinary code deployments do not.
+
+### IAM scope and GitHub Actions
+
+- Local and GitHub roles assume `candy-map-cdk-deploy`; CDK passes only
+  `candy-map-cloudformation` to CloudFormation. Deployment permissions cover only the two app
+  stack names, project asset/web buckets, version parameter, and this CloudFront distribution.
+- CloudFormation can manage only named project tables, functions, buckets and runtime-role paths.
+  IAM role creation must attach the project permissions boundary; `iam:PassRole` is restricted
+  to project runtime roles and Lambda. The boundary permits only project DynamoDB reads/writes
+  and project Lambda logs, so an inline runtime policy cannot grant IAM/admin access.
+- Some AWS operations cannot be scoped to an existing ARN (resource creation, Cognito domain
+  lookup, CloudFormation template validation/listing, API Gateway tagging). These retain necessary
+  service-specific permissions; generated resource CRUD scopes are tightened after provisioning.
+  Trusted deployers can create new resources within those services, but have no AdministratorAccess.
+- GitHub trust requires the exact repository's `production` environment and the STS audience.
+  Configure that environment's deployment branch policy to permit only `main`.
+- Set environment variables `AWS_ACCOUNT_ID`, `AWS_REGION`, and `AWS_DEPLOY_ROLE_ARN` (the
+  `GitHubDeployRoleArn` setup output). They are identifiers, not secrets.
+- The workflow verifies builds, tests and lint on PRs and main. Only verified main pushes or manual
+  runs on main deploy via OIDC. npm downloads are cached; deployments serialize and are never
+  cancelled halfway through. PR jobs have no AWS credentials.
+
+The live database starts empty, deliberately without publishing synthetic houses as real data.
+To create the first neighborhood, sign in, then call authenticated `POST /neighborhoods` with
+a small polygon. The creator becomes its organizer. Claim houses via the resident screen;
+approve them via the organizer screen using `<houseId>::<claimantUserId>`. Neighborhood creation
+and moderation queues still lack complete UI; see limitations below.
 
 ## Environment variables
 
@@ -74,8 +124,8 @@ this POC; see "Known limitations" below.
 | `apps/web` | `VITE_API_BASE_URL` | CDK output `ApiUrl` |
 | `apps/web` | `VITE_COGNITO_DOMAIN` | CDK output `CognitoHostedUiDomain` |
 | `apps/web` | `VITE_COGNITO_CLIENT_ID` | CDK output `UserPoolClientId` |
-| `infrastructure` | `-c allowedOrigin=` | your deployed web origin (CORS + Cognito callback) |
-| `infrastructure` | `-c cognitoDomainPrefix=` | must be globally unique per AWS region |
+| `infrastructure` | `-c allowedOrigin=` | optional override; CloudFront origin is automatic |
+| `infrastructure` | `-c cognitoDomainPrefix=` | optional override; defaults to account+region |
 | `services/api` Lambdas | `TABLE_NAME`, `ALLOWED_ORIGIN` | set automatically by the CDK stack |
 
 Without `apps/web`'s env vars, the app still runs fully in "fixture mode": the public map shows
@@ -84,19 +134,18 @@ instead of broken buttons.
 
 ## AWS resources & cost cautions
 
-- **DynamoDB**: on-demand (pay-per-request) billing, `RemovalPolicy.DESTROY` — the table (and all
-  data) is deleted on `cdk destroy`. Fine for a POC; change to `RETAIN` before real data exists.
+- **DynamoDB**: on-demand billing, deletion protection and `RemovalPolicy.RETAIN`.
 - **Lambda**: 9 functions, Node 22, default memory/timeout. Bundled with esbuild (no Docker
-  required), ~1.3MB zipped each (dominated by the bundled AWS SDK v3 + Turf.js).
+  required), ~1.3MB uncompressed bundles (dominated by the bundled AWS SDK v3 + Turf.js).
 - **API Gateway HTTP API**: cheaper than REST APIs; default stage throttled to 20 req/s (40
   burst) — see `infrastructure/lib/candy-map-stack.ts`.
-- **Cognito**: User Pool + Hosted UI domain. Cognito's free tier covers low MAU; `RemovalPolicy.
-  DESTROY` on the pool too.
-- Nothing here provisions Amazon Location Service, CloudFront, or Amplify Hosting — this POC uses
-  MapLibre with a free demo tile style and leaves static web hosting to whatever you prefer.
-- **Run `cdk destroy` when done experimenting** — nothing in this stack is a "set it and forget
-  it, no ongoing cost" resource; DynamoDB on-demand and Lambda are usage-based, but the Cognito
-  user pool and API Gateway stage exist whether or not they're used.
+- **Cognito**: User Pool + Hosted UI domain, retained and deletion-protected.
+- **S3 + CloudFront**: private retained buckets, CDN requests/transfer and invalidations have usage
+  charges; no custom domain, certificate, WAF or Amazon Location resources are provisioned.
+  MapLibre still uses a public demo tile provider.
+- No budget alarm or spend cap is configured. Monitor usage before publicizing the app.
+  Removal is intentionally privileged/manual: app deployment roles cannot delete stacks, and
+  retained data/auth/buckets are not removed by stack deletion.
 
 ## Known limitations
 
@@ -113,20 +162,29 @@ up-to-date list. Highlights:
   allowed by the plan for this POC ("POC may scan one small regional set"); documented in
   `packages/shared/src/geo.ts` and `services/api/src/lib/neighborhoodLock.ts` as needing a real
   geohash/S2 index and multi-cell locking before scaling past one region.
-- **No deployment has actually been run** against a real AWS account in this session (no
-  credentials available) — `cdk synth` and all unit/integration tests pass, but nothing below
-  that has been exercised end-to-end on real infrastructure. Treat the smoke-test checklist below
-  as unverified until someone runs it post-deploy.
+- **The full resident/organizer flow still needs real user QA.** Live HTTP smoke checks verify
+  deployment plumbing, not address validity, home ownership, claim races or moderation workflows.
+  No real geocoder, moderation queue or neighborhood-creation UI is included yet.
 - Map tiles come from MapLibre's public demo style (`demotiles.maplibre.org`), explicitly intended
   for testing/demos only — swap for a licensed tile provider or Amazon Location Service before any
   real usage.
 - No QR code image; a copyable share link (`?lat=&lon=`) covers the same acceptance criterion.
-- No mobile device lab was available in this session — only desktop browser automation was used
-  to verify the mobile-first layout renders; a real device pass is still needed.
+- Browser smoke checks passed at a 390x844 mobile viewport with a working hosted map worker
+  and no horizontal overflow. Cognito's sign-in redirect was exercised, but no real account
+  sign-in/claim/approval flow or physical-device pass has been completed.
+
+### Deployment verification
+
+- Both app CloudFormation stacks completed successfully using the local project role.
+- Live HTTPS, public API array responses, exact-origin CORS, SPA callback routing and unsigned
+  request rejection passed.
+- All three resolved IAM policies passed AWS policy validation. Permission simulation rejected
+  unrelated stacks, distributions, functions, user pools and IAM roles.
+- 111 tests pass, including loading all nine real bundled Lambda handlers in Node.
 
 ## Manual smoke-test checklist
 
-Run after deploying (see "Deployment steps"). Each line maps to an acceptance criterion in
+Run after deploying (see "Deployment"). Each line maps to an acceptance criterion in
 `COPILOT_PLAN.md`.
 
 1. [ ] Open the deployed web app on two different phones/browsers at the same share link —

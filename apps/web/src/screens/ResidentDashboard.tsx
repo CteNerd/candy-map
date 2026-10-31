@@ -1,14 +1,13 @@
 import { useEffect, useState, type FormEvent } from "react";
-import type { CandyStatus, House, HouseClaim } from "@candy-map/shared";
+import { isPointInPolygon, type CandyStatus, type HouseClaim } from "@candy-map/shared";
 import { useAuth } from "../auth/AuthContext";
-import { fetchMyClaims, isLiveApiConfigured, resolveHouse, submitClaim, toggleCandyStatus } from "../lib/api";
+import { fetchMyClaims, fetchNeighborhoodsNear, isLiveApiConfigured, resolveHouse, submitClaim, toggleCandyStatus } from "../lib/api";
 import { SEED_NEIGHBORHOOD } from "../lib/fixtures";
 
 const STATUS_OPTIONS: CandyStatus[] = ["available", "low", "finished"];
 
 export function ResidentDashboard() {
   const { user, isConfigured, signIn, signOut } = useAuth();
-  const [house, setHouse] = useState<House | null>(null);
   const [claim, setClaim] = useState<HouseClaim | null>(null);
   const [street, setStreet] = useState("");
   const [unit, setUnit] = useState("");
@@ -25,9 +24,7 @@ export function ResidentDashboard() {
         const mine = claims[0];
         if (mine) setClaim(mine);
       })
-      .catch(() => {
-        /* best-effort restore only */
-      });
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Could not restore your claims."));
   }, [user]);
 
   if (!isConfigured) {
@@ -60,15 +57,21 @@ export function ResidentDashboard() {
     setBusy(true);
     setError(null);
     try {
+      const point = { lat: Number(lat), lon: Number(lon) };
+      if (!lat.trim() || !lon.trim() || !Number.isFinite(point.lat) || !Number.isFinite(point.lon)) {
+        throw new Error("Enter valid latitude and longitude.");
+      }
+      const neighborhoods = await fetchNeighborhoodsNear(point.lat, point.lon);
+      const neighborhood = neighborhoods.find((candidate) => isPointInPolygon(point, candidate.polygon));
+      if (!neighborhood) throw new Error("No neighborhood contains this point. Ask an organizer to create one first.");
       const { house: resolvedHouse } = await resolveHouse({
-        neighborhoodId: SEED_NEIGHBORHOOD.id,
+        neighborhoodId: neighborhood.id,
         street,
         unit: unit || undefined,
         postalCode,
         country: "us",
-        point: { lat: Number.parseFloat(lat), lon: Number.parseFloat(lon) },
+        point,
       });
-      setHouse(resolvedHouse);
       const newClaim = await submitClaim(resolvedHouse.id);
       setClaim(newClaim);
     } catch (err) {
@@ -79,11 +82,14 @@ export function ResidentDashboard() {
   }
 
   async function onToggleStatus(status: CandyStatus) {
-    if (!house) return;
+    if (!claim) {
+      setError("No house claim is selected.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      await toggleCandyStatus(house.id, { status, publicOptIn: true });
+      await toggleCandyStatus(claim.houseId, { status, publicOptIn: true });
     } catch (err) {
       setError((err as Error).message);
     } finally {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import type { Neighborhood, PublicHousePin } from "@candy-map/shared";
+import type { PublicNeighborhood, PublicHousePin } from "@candy-map/shared";
 import { fetchNeighborhoodHouses, fetchNeighborhoodsNear } from "../lib/api";
 import { formatRelativeTime } from "../lib/time";
 import { MapLibreMap } from "../map/MapLibreMap";
@@ -17,10 +17,12 @@ const STATUS_LABEL: Record<PublicHousePin["status"], string> = {
 
 export function NeighborhoodMapScreen() {
   const [searchParams] = useSearchParams();
-  const [neighborhood, setNeighborhood] = useState<Neighborhood | null>(null);
+  const [neighborhood, setNeighborhood] = useState<PublicNeighborhood | null>(null);
   const [pins, setPins] = useState<PublicHousePin[]>([]);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(() => new Date());
   const [shareCopied, setShareCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   // A share link encodes the point to look up (lat/lon) rather than a neighborhood id directly —
   // COPILOT_PLAN.md's API contract has no "get neighborhood by id" endpoint, only
@@ -34,14 +36,27 @@ export function NeighborhoodMapScreen() {
     let cancelled = false;
 
     async function load() {
-      const neighborhoods = await fetchNeighborhoodsNear(lookupPoint.lat, lookupPoint.lon);
-      const first = neighborhoods[0] ?? null;
-      if (cancelled || !first) return;
-      setNeighborhood(first);
-      const housePins = await fetchNeighborhoodHouses(first.id);
-      if (cancelled) return;
-      setPins(housePins);
-      setLastRefreshed(new Date());
+      try {
+        const neighborhoods = await fetchNeighborhoodsNear(lookupPoint.lat, lookupPoint.lon);
+        const first = neighborhoods[0] ?? null;
+        if (cancelled) return;
+        setError(null);
+        setLoaded(true);
+        setNeighborhood(first);
+        if (!first) {
+          setPins([]);
+          return;
+        }
+        const housePins = await fetchNeighborhoodHouses(first.id);
+        if (cancelled) return;
+        setPins(housePins);
+        setLastRefreshed(new Date());
+      } catch (err) {
+        if (!cancelled) {
+          setPins([]);
+          setError(err instanceof Error ? err.message : "Could not load the map.");
+        }
+      }
     }
 
     load();
@@ -74,11 +89,12 @@ export function NeighborhoodMapScreen() {
       />
       <div className="card" style={{ margin: "0.75rem", borderRadius: "var(--radius)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.5rem" }}>
-          <strong>{neighborhood?.name ?? "Loading neighborhood…"}</strong>
+          <strong>{neighborhood?.name ?? (loaded ? "No neighborhoods near this point" : "Loading neighborhood…")}</strong>
           <button className="btn btn--secondary" onClick={onShare} disabled={!neighborhood} style={{ padding: "0.3rem 0.7rem", fontSize: "0.8rem" }}>
             {shareCopied ? "Copied!" : "Share"}
           </button>
         </div>
+        {error && <p role="alert" className="muted">{error}</p>}
         <p className="muted">
           {pins.length} house{pins.length === 1 ? "" : "s"} opted in · refreshed {formatRelativeTime(lastRefreshed.toISOString())}
         </p>

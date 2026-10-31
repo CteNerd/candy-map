@@ -8,6 +8,7 @@ import * as apigw from "aws-cdk-lib/aws-apigatewayv2";
 import * as integrations from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as authorizers from "aws-cdk-lib/aws-apigatewayv2-authorizers";
 import * as cognito from "aws-cdk-lib/aws-cognito";
+import * as iam from "aws-cdk-lib/aws-iam";
 
 const API_HANDLERS_DIR = path.join(__dirname, "..", "..", "services", "api", "src", "handlers");
 
@@ -28,11 +29,13 @@ export class CandyMapStack extends cdk.Stack {
     // --- Data store -------------------------------------------------------
     // Single-table design — see services/api/src/lib/table.ts for the full key schema.
     const table = new dynamodb.Table(this, "CandyMapTable", {
+      tableName: "candy-map-data",
       partitionKey: { name: "pk", type: dynamodb.AttributeType.STRING },
       sortKey: { name: "sk", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       timeToLiveAttribute: "ttl",
-      removalPolicy: cdk.RemovalPolicy.DESTROY, // POC only — switch to RETAIN before real data exists.
+      deletionProtection: true,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
     table.addGlobalSecondaryIndex({
       indexName: "gsi1",
@@ -48,7 +51,9 @@ export class CandyMapStack extends cdk.Stack {
       standardAttributes: { email: { required: true, mutable: true } },
       passwordPolicy: { minLength: 8, requireLowercase: true, requireUppercase: true, requireDigits: true },
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
-      removalPolicy: cdk.RemovalPolicy.DESTROY, // POC only.
+      userPoolName: "candy-map-residents",
+      deletionProtection: true,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
     // Cognito rejects "*" as a callback URL, so the wildcard POC default only gets a localhost
@@ -86,20 +91,37 @@ export class CandyMapStack extends cdk.Stack {
     };
 
     const bundling: nodejs.BundlingOptions = {
-      format: nodejs.OutputFormat.ESM,
+      format: nodejs.OutputFormat.CJS,
       target: "node22",
       // Keep the AWS SDK pinned to our package.json version rather than whatever the Lambda
       // runtime happens to ship, for reproducible builds.
       externalModules: [],
     };
 
-    const makeFn = (name: string, entryFile: string) =>
-      new nodejs.NodejsFunction(this, name, {
+    const makeFn = (name: string, entryFile: string) => {
+      const functionName = `candy-map-${name}`;
+      const role = new iam.Role(this, `${name}Role`, {
+        roleName: functionName,
+        path: "/candy-map/runtime/",
+        assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
+        permissionsBoundary: iam.ManagedPolicy.fromManagedPolicyArn(
+          this, `${name}Boundary`,
+          `arn:${this.partition}:iam::${this.account}:policy/candy-map-runtime-boundary`,
+        ),
+      });
+      role.addToPolicy(new iam.PolicyStatement({
+        actions: ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+        resources: [`arn:${this.partition}:logs:${this.region}:${this.account}:log-group:/aws/lambda/${functionName}:*`],
+      }));
+      return new nodejs.NodejsFunction(this, name, {
+        functionName,
+        role,
         entry: path.join(API_HANDLERS_DIR, entryFile),
         runtime: lambda.Runtime.NODEJS_22_X,
         environment: commonEnvironment,
         bundling,
       });
+    };
 
     // Public read path (Milestone 2)
     const getNeighborhoodsFn = makeFn("GetNeighborhoodsFn", "getNeighborhoods.ts");
@@ -120,8 +142,8 @@ export class CandyMapStack extends cdk.Stack {
     table.grant(getNeighborhoodsFn, "dynamodb:Scan");
     table.grant(getNeighborhoodHousesFn, "dynamodb:Query", "dynamodb:GetItem");
     // PutItem (spatial creation lock) + Scan (overlap candidate search) were added in Milestone 4.
-    table.grant(createNeighborhoodFn, "dynamodb:TransactWriteItems", "dynamodb:PutItem", "dynamodb:Scan");
-    table.grant(resolveHouseFn, "dynamodb:GetItem", "dynamodb:TransactWriteItems");
+    table.grant(createNeighborhoodFn, "dynamodb:PutItem", "dynamodb:Scan");
+    table.grant(resolveHouseFn, "dynamodb:GetItem", "dynamodb:PutItem");
     table.grant(submitClaimFn, "dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem");
     table.grant(toggleCandyStatusFn, "dynamodb:GetItem", "dynamodb:PutItem");
     table.grant(getMyClaimsFn, "dynamodb:Query");
@@ -144,6 +166,7 @@ export class CandyMapStack extends cdk.Stack {
     // DynamoDB-backed rate limiter in each write handler.
     const cfnDefaultStage = httpApi.defaultStage!.node.defaultChild as apigw.CfnStage;
     cfnDefaultStage.defaultRouteSettings = { throttlingBurstLimit: 40, throttlingRateLimit: 20 };
+    cdk.Tags.of(httpApi.defaultStage!).add("Name", "candy-map-api");
 
     // Public routes — no authorizer.
     httpApi.addRoutes({
@@ -214,4 +237,3 @@ export class CandyMapStack extends cdk.Stack {
     });
   }
 }
-

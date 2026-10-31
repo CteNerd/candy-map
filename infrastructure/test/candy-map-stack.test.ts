@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import * as cdk from "aws-cdk-lib";
 import { Template } from "aws-cdk-lib/assertions";
 import { CandyMapStack } from "../lib/candy-map-stack";
+import { existsSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 
 function synthesize() {
   const app = new cdk.App();
@@ -14,6 +17,24 @@ function synthesize() {
 }
 
 describe("CandyMapStack", () => {
+  it("loads every bundled Lambda handler in Node without dynamic-require initialization errors", () => {
+    const app = new cdk.App();
+    new CandyMapStack(app, "BundleTest", {
+      allowedOrigin: "https://example.com", cognitoDomainPrefix: "candy-map-bundle-test",
+      env: { account: "123456789012", region: "us-east-1" },
+    });
+    app.synth();
+    const bundles = readdirSync(app.outdir)
+      .filter((entry) => entry.startsWith("asset."))
+      .map((entry) => join(app.outdir, entry, "index.js"))
+      .filter((entry) => existsSync(entry));
+    expect(bundles).toHaveLength(9);
+    const result = spawnSync(process.execPath, ["-e",
+      "for (const file of process.argv.slice(1)) { if (typeof require(file).handler !== 'function') throw new Error('Missing handler: ' + file); }",
+      ...bundles], { encoding: "utf8" });
+    expect(result.error).toBeUndefined();
+    expect(result.status, result.stderr).toBe(0);
+  });
   it("creates a single DynamoDB table with pk/sk and a gsi1 index", () => {
     const template = synthesize();
     template.hasResourceProperties("AWS::DynamoDB::Table", {
@@ -32,6 +53,8 @@ describe("CandyMapStack", () => {
       ],
     });
     template.resourceCountIs("AWS::DynamoDB::Table", 1);
+    template.hasResource("AWS::DynamoDB::Table", { DeletionPolicy: "Retain" });
+    template.hasResourceProperties("AWS::DynamoDB::Table", { DeletionProtectionEnabled: true });
   });
 
   it("creates a Cognito user pool, client, and hosted-UI domain", () => {
@@ -42,6 +65,8 @@ describe("CandyMapStack", () => {
     template.hasResourceProperties("AWS::Cognito::UserPoolClient", {
       AllowedOAuthFlows: ["code"],
     });
+    template.hasResource("AWS::Cognito::UserPool", { DeletionPolicy: "Retain" });
+    template.hasResourceProperties("AWS::Cognito::UserPool", { DeletionProtection: "ACTIVE" });
   });
 
   it("creates one Lambda function per public + authenticated handler (9 total)", () => {
@@ -106,7 +131,8 @@ describe("CandyMapStack", () => {
     expect(allActions).toContain("dynamodb:GetItem");
     // ...alongside the write actions Milestone 3 legitimately needs.
     expect(allActions).toContain("dynamodb:PutItem");
-    expect(allActions).toContain("dynamodb:TransactWriteItems");
+    // DynamoDB authorizes transaction components via PutItem, not a TransactWriteItems IAM action.
+    expect(allActions).not.toContain("dynamodb:TransactWriteItems");
     // Nothing in this stack ever deletes data.
     expect(allActions).not.toContain("dynamodb:DeleteItem");
   });

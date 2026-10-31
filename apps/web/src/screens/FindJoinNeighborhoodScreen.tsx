@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from "react";
-import type { Neighborhood } from "@candy-map/shared";
+import type { PublicNeighborhood } from "@candy-map/shared";
 import { isPointInPolygon } from "@candy-map/shared";
 import { fetchNeighborhoodsNear } from "../lib/api";
 
 interface ResultRow {
-  neighborhood: Neighborhood;
+  neighborhood: PublicNeighborhood;
   contains: boolean;
 }
 
@@ -17,6 +17,7 @@ export function FindJoinNeighborhoodScreen() {
 
   async function search(searchLat: number, searchLon: number) {
     setLoading(true);
+    setGeoError(null);
     try {
       const neighborhoods = await fetchNeighborhoodsNear(searchLat, searchLon);
       setResults(
@@ -25,6 +26,9 @@ export function FindJoinNeighborhoodScreen() {
           contains: isPointInPolygon({ lat: searchLat, lon: searchLon }, neighborhood.polygon),
         })),
       );
+    } catch (err) {
+      setResults(null);
+      setGeoError(err instanceof Error ? err.message : "Could not search neighborhoods.");
     } finally {
       setLoading(false);
     }

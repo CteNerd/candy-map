@@ -1,8 +1,11 @@
 import { useEffect, useRef } from "react";
-import { Map as MapLibreMapInstance, Marker, NavigationControl } from "maplibre-gl";
+import { Map as MapLibreMapInstance, Marker, NavigationControl, setWorkerUrl } from "maplibre-gl";
 import type { GeoJSONSource } from "maplibre-gl";
+import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { MapViewProps } from "./MapAdapter";
+
+setWorkerUrl(workerUrl);
 
 /**
  * Demo vector-tile style published by the MapLibre project itself, specifically intended for

@@ -8,6 +8,7 @@ build/
 !.env.example
 .DS_Store
 cdk.out/
+cdk.deployment.out/
 coverage/
 .aws-sam/
 *.tsbuildinfo
