@@ -44,9 +44,9 @@ describe("CandyMapStack", () => {
     });
   });
 
-  it("creates one Lambda function per public + authenticated handler (8 total)", () => {
+  it("creates one Lambda function per public + authenticated handler (9 total)", () => {
     const template = synthesize();
-    template.resourceCountIs("AWS::Lambda::Function", 8);
+    template.resourceCountIs("AWS::Lambda::Function", 9);
   });
 
   it("creates an HTTP API with the public and authenticated routes", () => {
@@ -61,11 +61,19 @@ describe("CandyMapStack", () => {
       "PATCH /houses/{id}/candy",
       "GET /me/claims",
       "POST /admin/claims/{id}/approve",
+      "POST /houses/{id}/reports",
     ];
     for (const routeKey of expectedRouteKeys) {
       template.hasResourceProperties("AWS::ApiGatewayV2::Route", { RouteKey: routeKey });
     }
     template.resourceCountIs("AWS::ApiGatewayV2::Route", expectedRouteKeys.length);
+  });
+
+  it("throttles the default API stage", () => {
+    const template = synthesize();
+    template.hasResourceProperties("AWS::ApiGatewayV2::Stage", {
+      DefaultRouteSettings: { ThrottlingBurstLimit: 40, ThrottlingRateLimit: 20 },
+    });
   });
 
   it("attaches a JWT authorizer to every authenticated route and no public route", () => {

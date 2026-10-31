@@ -51,16 +51,25 @@ unfinished acceptance criteria" at the bottom — nothing is silently dropped.
       (claim id entered manually — see "Known gaps" below)
 
 ## Milestone 4 — Duplicate-neighborhood checks, reports, hardening
-- [ ] Neighborhood overlap check (>=0.8 block, >=0.1 review queue) using bbox/grid candidates +
-      Turf intersection, both directions (new/existing)
-- [ ] Neighborhood-creation reservation keyed by coarse spatial cell (conditional write, TTL) to
-      prevent simultaneous duplicate creation — single-cell POC, documented limitation for
-      multi-cell production locking
-- [ ] `POST /houses/{id}/reports` (authenticated, rate-limited, pending moderation; not published)
-- [ ] API throttling / per-account-per-house rate limiting
-- [ ] Mobile QA pass, deployment docs, QR/share-link for a neighborhood
-- [ ] Additional integration tests (conditional-write race, claim conflicts, duplicate
-      neighborhood reservation, public response shape)
+- [x] Neighborhood overlap check (>=0.8 block, >=0.1 review queue) using bbox pre-filter + Turf
+      intersection, both directions (new/existing) — `createNeighborhood.ts`, unit-tested
+- [x] Neighborhood-creation reservation keyed by coarse spatial cell (conditional write, TTL) to
+      prevent simultaneous duplicate creation — single-cell POC (documented limitation in
+      `lib/neighborhoodLock.ts` for multi-cell production locking); one retry on contention
+- [x] `POST /houses/{id}/reports` (authenticated, rate-limited, pending moderation; not published)
+- [x] API throttling (API Gateway default stage, 20 rps / 40 burst) / per-account-per-house rate
+      limiting (DynamoDB conditional-write windows on both claims and reports)
+- [x] Share-link for a neighborhood (`?lat=&lon=` deep link + "Share" button, copies to clipboard)
+- [ ] Mobile QA pass — not performed; see README "Known limitations" (no real device/viewport lab
+      available in this session; only desktop browser automation was used)
+- [ ] QR code image generation — deliberately **not** implemented: would require either a
+      client-side QR library (fine) or an external QR image API (a third-party data-sharing
+      concern for no real benefit over the share link). The share link itself satisfies the
+      acceptance criterion; add a QR library (e.g. `qrcode`) as a follow-up if a physical/printed
+      share method is needed.
+- [x] Additional tests: conditional-write race (resolveHouse, Milestone 3), claim conflicts
+      (submitClaim, Milestone 3), duplicate-neighborhood reservation + overlap (createNeighborhood,
+      this milestone), public response shape (PII-free projections, Milestone 2)
 
 ## Known gaps / unfinished acceptance criteria
 _(This section is updated as implementation proceeds; see bottom of README for final status.)_

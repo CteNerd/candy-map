@@ -65,6 +65,11 @@ export function neighborhoodLockKey(gridCellId: string): TableKey {
   return { pk: `NBHD_LOCK#${gridCellId}`, sk: "RESERVATION" };
 }
 
+/** Per-(user, house, action) rate-limit window — see lib/rateLimit.ts. */
+export function rateLimitKey(action: string, userId: string, houseId: string): TableKey {
+  return { pk: `RATE#${action}#${userId}#${houseId}`, sk: "WINDOW" };
+}
+
 export function houseGsi1(neighborhoodId: string, houseId: string): Gsi1Key {
   return { gsi1pk: `NEIGHBORHOOD#${neighborhoodId}`, gsi1sk: `HOUSE#${houseId}` };
 }

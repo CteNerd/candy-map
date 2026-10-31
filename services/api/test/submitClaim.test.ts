@@ -68,4 +68,14 @@ describe("submitClaim handler", () => {
     expect(body.status).toBe("approved");
     expect(body.updatedAt).toBe(existing.updatedAt);
   });
+
+  it("returns 429 when the per-house claim rate limit has already been consumed", async () => {
+    ddbMock.on(QueryCommand).resolves({ Items: [] });
+    const rateLimitError = new Error("Conditional check failed");
+    rateLimitError.name = "ConditionalCheckFailedException";
+    ddbMock.on(PutCommand).rejects(rateLimitError);
+
+    const result = (await handler(makeEvent({ houseId: "house-1" }))) as APIGatewayProxyStructuredResultV2;
+    expect(result.statusCode).toBe(429);
+  });
 });

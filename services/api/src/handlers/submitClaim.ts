@@ -11,8 +11,11 @@ import { canSubmitClaim } from "@candy-map/shared";
 import type { HouseClaim } from "@candy-map/shared";
 import { ddbDocClient } from "../lib/ddb.js";
 import { getAuthenticatedUserId } from "../lib/auth.js";
+import { tryConsumeRateLimit } from "../lib/rateLimit.js";
 import { errorResponse, jsonResponse } from "../lib/responses.js";
 import { claimGsi1, getTableName, houseClaimKey, houseKey } from "../lib/table.js";
+
+const CLAIM_RATE_LIMIT_WINDOW_SECONDS = 60;
 
 export async function handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> {
   const userId = getAuthenticatedUserId(event);
@@ -52,6 +55,11 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<APIGateway
 
   const otherApprovedClaim = existingClaims.find((claim) => claim.status === "approved" && claim.userId !== userId);
   const { resultingStatus } = canSubmitClaim(otherApprovedClaim);
+
+  const allowed = await tryConsumeRateLimit(tableName, "claim", userId, houseId, CLAIM_RATE_LIMIT_WINDOW_SECONDS);
+  if (!allowed) {
+    return errorResponse(429, "Too many claim attempts on this house — please wait a minute and try again.");
+  }
 
   const now = new Date().toISOString();
   const claim: HouseClaim = {

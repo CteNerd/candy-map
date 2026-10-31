@@ -113,15 +113,20 @@ export class CandyMapStack extends cdk.Stack {
     const getMyClaimsFn = makeFn("GetMyClaimsFn", "getMyClaims.ts");
     const approveClaimFn = makeFn("ApproveClaimFn", "approveClaim.ts");
 
+    // Authenticated write path (Milestone 4)
+    const reportHouseFn = makeFn("ReportHouseFn", "reportHouse.ts");
+
     // Least-privilege: each function only gets the DynamoDB actions it actually performs.
     table.grant(getNeighborhoodsFn, "dynamodb:Scan");
     table.grant(getNeighborhoodHousesFn, "dynamodb:Query", "dynamodb:GetItem");
-    table.grant(createNeighborhoodFn, "dynamodb:TransactWriteItems");
+    // PutItem (spatial creation lock) + Scan (overlap candidate search) were added in Milestone 4.
+    table.grant(createNeighborhoodFn, "dynamodb:TransactWriteItems", "dynamodb:PutItem", "dynamodb:Scan");
     table.grant(resolveHouseFn, "dynamodb:GetItem", "dynamodb:TransactWriteItems");
     table.grant(submitClaimFn, "dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem");
     table.grant(toggleCandyStatusFn, "dynamodb:GetItem", "dynamodb:PutItem");
     table.grant(getMyClaimsFn, "dynamodb:Query");
     table.grant(approveClaimFn, "dynamodb:GetItem", "dynamodb:PutItem");
+    table.grant(reportHouseFn, "dynamodb:GetItem", "dynamodb:PutItem");
 
     // --- HTTP API -------------------------------------------------------
     const httpApi = new apigw.HttpApi(this, "CandyMapHttpApi", {
@@ -132,6 +137,13 @@ export class CandyMapStack extends cdk.Stack {
         allowHeaders: ["authorization", "content-type"],
       },
     });
+
+    // POC-scale API Gateway throttle (plan: "add API throttling"). The L2 HttpApi/HttpStage
+    // constructs don't expose default route throttling, so this drops to the L1 CfnStage —
+    // per-user/per-house limiting (the more important defense) still comes from the
+    // DynamoDB-backed rate limiter in each write handler.
+    const cfnDefaultStage = httpApi.defaultStage!.node.defaultChild as apigw.CfnStage;
+    cfnDefaultStage.defaultRouteSettings = { throttlingBurstLimit: 40, throttlingRateLimit: 20 };
 
     // Public routes — no authorizer.
     httpApi.addRoutes({
@@ -184,6 +196,12 @@ export class CandyMapStack extends cdk.Stack {
       path: "/admin/claims/{id}/approve",
       methods: [apigw.HttpMethod.POST],
       integration: new integrations.HttpLambdaIntegration("ApproveClaimIntegration", approveClaimFn),
+      authorizer,
+    });
+    httpApi.addRoutes({
+      path: "/houses/{id}/reports",
+      methods: [apigw.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration("ReportHouseIntegration", reportHouseFn),
       authorizer,
     });
 
