@@ -1,8 +1,4 @@
-/**
- * Map rendering is behind a small adapter interface so the "MapLibre now, Amazon Location Service
- * later" decision in COPILOT_PLAN.md is a drop-in swap rather than a rewrite. Screens depend only
- * on `MapView` (see `MapLibreMap.tsx`), never on `maplibre-gl` directly.
- */
+/** Provider-independent map inputs; domain coordinates remain [longitude, latitude]. */
 import type { GeoPoint, CandyStatus } from "@candy-map/shared";
 
 export interface MapPin {
@@ -18,4 +14,9 @@ export interface MapViewProps {
   pins: MapPin[];
   onPinClick?: (pinId: string) => void;
   className?: string;
+  selectedPoint?: GeoPoint;
+  userLocation?: GeoPoint;
+  draftPath?: GeoPoint[];
+  onMapClick?: (point: GeoPoint) => void;
+  onCenterChange?: (point: GeoPoint) => void;
 }

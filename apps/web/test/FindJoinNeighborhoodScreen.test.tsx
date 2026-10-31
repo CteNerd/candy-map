@@ -1,6 +1,8 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { FindJoinNeighborhoodScreen } from "../src/screens/FindJoinNeighborhoodScreen";
+vi.mock("../src/map/AddressSearch", () => ({ AddressSearch: () => <div /> }));
 
 afterEach(() => {
   cleanup();
@@ -8,7 +10,7 @@ afterEach(() => {
 
 describe("FindJoinNeighborhoodScreen", () => {
   it("flags a point inside the seeded neighborhood as containing it", async () => {
-    render(<FindJoinNeighborhoodScreen />);
+    render(<MemoryRouter><FindJoinNeighborhoodScreen /></MemoryRouter>);
 
     fireEvent.change(screen.getByLabelText("Latitude"), { target: { value: "37.7765" } });
     fireEvent.change(screen.getByLabelText("Longitude"), { target: { value: "-122.428" } });
@@ -18,7 +20,7 @@ describe("FindJoinNeighborhoodScreen", () => {
   });
 
   it("flags a point outside the seeded neighborhood as nearby only", async () => {
-    render(<FindJoinNeighborhoodScreen />);
+    render(<MemoryRouter><FindJoinNeighborhoodScreen /></MemoryRouter>);
 
     fireEvent.change(screen.getByLabelText("Latitude"), { target: { value: "10" } });
     fireEvent.change(screen.getByLabelText("Longitude"), { target: { value: "10" } });

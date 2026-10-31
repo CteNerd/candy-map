@@ -108,9 +108,78 @@ button {
 }
 
 .map-container {
+  position: relative;
   flex: 1;
   min-height: 320px;
   width: 100%;
+}
+
+.google-map-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.map-container > .banner,
+.map-editor > .banner {
+  position: relative;
+  z-index: 1;
+}
+
+.map-editor {
+  position: relative;
+  height: 380px;
+  min-height: 380px;
+  width: 100%;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.map-toolbar {
+  padding: 0.75rem 0.75rem 0;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+a.btn {
+  text-decoration: none;
+  display: inline-block;
+}
+
+.address-search {
+  width: 100%;
+  min-width: 0;
+}
+
+gmp-place-autocomplete {
+  width: 100%;
+}
+
+.candy-marker {
+  width: 28px;
+  height: 28px;
+  border: 3px solid white;
+  border-radius: 50%;
+  box-shadow: 0 2px 5px #0006;
+  cursor: pointer;
+}
+
+.location-marker {
+  width: 18px;
+  height: 18px;
+  background: #2563eb;
+  border: 3px solid white;
+  border-radius: 50%;
+  box-shadow: 0 0 0 8px #2563eb33;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .card {

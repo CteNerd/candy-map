@@ -1,9 +1,10 @@
 /** Local fixtures are used only when no live API is configured. */
-import type { CandyParticipation, CandyStatus, House, HouseClaim, PublicNeighborhood, PublicHousePin } from "@candy-map/shared";
+import type { CandyParticipation, CandyStatus, House, HouseClaim, Neighborhood, PolygonGeoJSON, PublicNeighborhood, PublicHousePin } from "@candy-map/shared";
 import { SEED_HOUSE_PINS, SEED_NEIGHBORHOOD } from "./fixtures";
 import { getIdToken } from "../auth/cognito";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string | undefined;
+const configuredUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
+const API_BASE_URL = configuredUrl && import.meta.env.DEV ? "/api" : configuredUrl;
 const REQUEST_TIMEOUT_MS = 5000;
 
 async function fetchJson<T>(path: string): Promise<T> {
@@ -90,4 +91,8 @@ export function fetchMyClaims(): Promise<HouseClaim[]> {
 
 export function approveClaim(claimId: string): Promise<HouseClaim> {
   return authenticatedFetch(`/admin/claims/${encodeURIComponent(claimId)}/approve`, { method: "POST" });
+}
+
+export function createNeighborhood(body: { name: string; polygon: PolygonGeoJSON }): Promise<Neighborhood> {
+  return authenticatedFetch("/neighborhoods", { method: "POST", body: JSON.stringify(body) });
 }

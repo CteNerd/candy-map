@@ -26,4 +26,14 @@ describe("public API deployment modes", () => {
     const { fetchNeighborhoodHouses } = await import("../src/lib/api");
     await expect(fetchNeighborhoodHouses("real-neighborhood")).rejects.toThrow("503");
   });
+
+  it.each([[true, "/api"], [false, "https://api.example.com"]])("uses the correct API origin in development=%s", async (dev, base) => {
+    vi.stubEnv("VITE_API_BASE_URL", "https://api.example.com");
+    vi.stubEnv("DEV", dev);
+    const fetch = vi.fn().mockResolvedValue(new Response("[]", { status: 200 }));
+    vi.stubGlobal("fetch", fetch);
+    const { fetchNeighborhoodsNear } = await import("../src/lib/api");
+    await fetchNeighborhoodsNear(10, 20);
+    expect(fetch).toHaveBeenCalledWith(`${base}/neighborhoods?lat=10&lon=20`, expect.objectContaining({ signal: expect.any(AbortSignal) }));
+  });
 });

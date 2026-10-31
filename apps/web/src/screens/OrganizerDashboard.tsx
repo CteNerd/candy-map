@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { approveClaim } from "../lib/api";
+import { Link, useSearchParams } from "react-router-dom";
 
 /**
  * Organizer claim approval is wired to the real `POST /admin/claims/{id}/approve` endpoint.
@@ -12,7 +13,8 @@ import { approveClaim } from "../lib/api";
  */
 export function OrganizerDashboard() {
   const { user, isConfigured, signIn } = useAuth();
-  const [claimId, setClaimId] = useState("");
+  const [params] = useSearchParams();
+  const [claimId, setClaimId] = useState(params.get("claim") ?? "");
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -21,6 +23,7 @@ export function OrganizerDashboard() {
     return (
       <div className="screen">
         <h2>Organizer dashboard</h2>
+        <Link className="btn" to="/neighborhoods/new">Add neighborhood</Link>
         <div className="banner">Sign-in isn't configured yet — see README "Environment variables".</div>
       </div>
     );

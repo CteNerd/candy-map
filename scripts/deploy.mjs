@@ -14,6 +14,9 @@ function outputs(stack) {
   return Object.fromEntries(result.Stacks[0].Outputs.map(({ OutputKey, OutputValue }) => [OutputKey, OutputValue]));
 }
 
+for (const key of ["VITE_GOOGLE_MAPS_API_KEY", "VITE_GOOGLE_MAPS_MAP_ID"]) {
+  if (!process.env[key]?.trim()) throw new Error(`Missing Google Maps build setting: ${key}`);
+}
 const identity = JSON.parse(run("aws", ["sts", "get-caller-identity", "--output", "json"],
   { stdio: ["ignore", "pipe", "inherit"] }));
 if (!/^arn:aws:sts::\d+:assumed-role\/candy-map-(local|github)-deploy\//.test(identity.Arn)) {

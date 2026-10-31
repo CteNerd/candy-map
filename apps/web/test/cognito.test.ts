@@ -11,8 +11,25 @@ describe("cognito auth helpers", () => {
   });
 
   it("reports not configured when env vars are absent", async () => {
+    vi.stubEnv("VITE_COGNITO_DOMAIN", "");
+    vi.stubEnv("VITE_COGNITO_CLIENT_ID", "");
     const { isAuthConfigured } = await import("../src/auth/cognito");
     expect(isAuthConfigured()).toBe(false);
+  });
+
+  it("restores the neighborhood workflow after signing in", async () => {
+    const { consumeSignInReturnPath } = await import("../src/auth/cognito");
+    sessionStorage.setItem("candy-map.auth.return_to", "/dashboard?neighborhood=maple");
+    expect(consumeSignInReturnPath()).toBe("/dashboard?neighborhood=maple");
+    expect(consumeSignInReturnPath()).toBe("/dashboard");
+  });
+
+  it("does not restore external or callback return paths", async () => {
+    const { consumeSignInReturnPath } = await import("../src/auth/cognito");
+    for (const path of ["//example.com", "https://example.com", "/auth/callback?code=old"]) {
+      sessionStorage.setItem("candy-map.auth.return_to", path);
+      expect(consumeSignInReturnPath()).toBe("/dashboard");
+    }
   });
 
   it("returns null for the current user when no token is stored", async () => {

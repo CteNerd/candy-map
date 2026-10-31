@@ -12,7 +12,7 @@ claims. Nothing here claims to verify identity or home ownership — a claim is 
 ## Architecture
 
 ```
-apps/web            React + Vite + TS, mobile-first, MapLibre (demo tiles; swap-ready adapter)
+apps/web            React + Vite + TS, mobile-first, Google Maps + Places address search
 services/api         Lambda handlers (Node 22, AWS SDK v3), one per endpoint
 infrastructure       AWS CDK (TypeScript): DynamoDB, API Gateway HTTP API, Cognito, Lambda, IAM
 packages/shared      Domain types + geo/address/authorization logic shared by web, api, and infra
@@ -115,10 +115,14 @@ requires an intentional privileged setup change; ordinary code deployments do no
   cancelled halfway through. PR jobs have no AWS credentials.
 
 The live database starts empty, deliberately without publishing synthetic houses as real data.
-To create the first neighborhood, sign in, then call authenticated `POST /neighborhoods` with
-a small polygon. The creator becomes its organizer. Claim houses via the resident screen;
-approve them via the organizer screen using `<houseId>::<claimantUserId>`. Neighborhood creation
-and moderation queues still lack complete UI; see limitations below.
+Choose **Add neighborhood**, sign in, search or locate your area, and tap boundary corners in
+order. Name and save the neighborhood; its creator becomes its organizer. Choose **Associate my
+house**, search the house address, select the neighborhood, and confirm the marker inside its
+boundary. Claims remain self-reported until approved. The pending-claim card links to the organizer
+approval screen with its claim ID filled in; only that neighborhood's organizer can approve it.
+After approval, return to Resident and explicitly select a candy status to opt into the public map.
+Overlapping neighborhoods may be pending review and cannot be selected in the active-neighborhood
+house workflow until activated. A review queue/activation UI is still missing.
 
 ## Environment variables
 
@@ -127,13 +131,41 @@ and moderation queues still lack complete UI; see limitations below.
 | `apps/web` | `VITE_API_BASE_URL` | CDK output `ApiUrl` |
 | `apps/web` | `VITE_COGNITO_DOMAIN` | CDK output `CognitoHostedUiDomain` |
 | `apps/web` | `VITE_COGNITO_CLIENT_ID` | CDK output `UserPoolClientId` |
+| `apps/web` | `VITE_GOOGLE_MAPS_API_KEY` | Google Maps Platform restricted browser key |
+| `apps/web` | `VITE_GOOGLE_MAPS_MAP_ID` | Google Maps Platform JavaScript map ID |
 | `infrastructure` | `-c allowedOrigin=` | optional override; CloudFront origin is automatic |
 | `infrastructure` | `-c cognitoDomainPrefix=` | optional override; defaults to account+region |
 | `services/api` Lambdas | `TABLE_NAME`, `ALLOWED_ORIGIN` | set automatically by the CDK stack |
 
-Without `apps/web`'s env vars, the app still runs fully in "fixture mode": the public map shows
-static seed data and the resident/organizer screens show a clear "not configured yet" message
-instead of broken buttons.
+Without API settings, public data uses clearly local fixtures and mutations cannot save. Google
+Maps still requires its key and map ID; missing settings show an explicit map error.
+
+### Google Maps and local development
+
+Enable **Maps JavaScript API** and **Places API (New)** in a billing-enabled Google Cloud project.
+Create a **JavaScript / Vector** map ID. Restrict the browser key to those APIs and to the deployed
+website; use a separate development key allowing `http://localhost:5173/*`. Browser keys are public
+in compiled assets even when supplied from GitHub secrets. Configure provider quotas and billing
+alerts before launch; alerts are not spending caps.
+
+Copy `apps/web/.env.example` to `apps/web/.env.local` and fill in the five public configuration
+values. The local file is gitignored. Run `npm run dev:web` and restart after changing environment
+settings. The dev server binds to port 5173 (no silent port fallback, since key restrictions and
+Cognito callbacks depend on it). With a live API URL configured, Vite proxies `/api` to that API
+for same-origin local requests; production builds call the API directly. **Local writes affect the
+configured live database**. No production CORS expansion is needed. Cognito must allow the local
+`http://localhost:5173/auth/callback` URL (already included by this stack).
+
+In GitHub's **production** environment, store `VITE_GOOGLE_MAPS_API_KEY` as a secret and
+`VITE_GOOGLE_MAPS_MAP_ID` as a variable. The deployment workflow supplies them to the build.
+Local `npm run deploy` requires both Google settings exported in its environment; it does not
+automatically read the frontend `.env.local`.
+
+The public map uses a shared-link location first; otherwise it automatically locates only if
+browser permission is already granted. **Use my location** requests permission explicitly.
+Search an address, or pan and choose **Search this area**, to load nearby neighborhoods. Location
+denial/timeouts and map/search failures are visible. Address search retrieves only location and
+address components; it does not establish house ownership.
 
 ## AWS resources & cost cautions
 
@@ -155,9 +187,9 @@ instead of broken buttons.
 See [`TASKS.md`](./TASKS.md) "Known gaps / unfinished acceptance criteria" for the full,
 up-to-date list. Highlights:
 
-- **No real geocoder.** `POST /houses/resolve` trusts a client-supplied lat/lon instead of
-  geocoding a street address (Amazon Location Service place search was deferred per the plan's
-  guidance to use a documented mock adapter rather than block the POC on service setup).
+- **No server-side address verification.** Google Places supplies address/location suggestions
+  in the UI, but `POST /houses/resolve` still trusts client-confirmed address fields and coordinates.
+  A claim is not proof of ownership or address validity.
 - **No "list pending claims/reports for a neighborhood" endpoint.** The organizer screens take a
   claim id as manual input because COPILOT_PLAN.md's API contract never defines a listing
   endpoint — only point-lookups by id.
@@ -167,12 +199,12 @@ up-to-date list. Highlights:
   geohash/S2 index and multi-cell locking before scaling past one region.
 - **The full resident/organizer flow still needs real user QA.** Live HTTP smoke checks verify
   deployment plumbing, not address validity, home ownership, claim races or moderation workflows.
-  No real geocoder, moderation queue or neighborhood-creation UI is included yet.
-- Map tiles come from MapLibre's public demo style (`demotiles.maplibre.org`), explicitly intended
-  for testing/demos only — swap for a licensed tile provider or Amazon Location Service before any
-  real usage.
+  Neighborhood creation and Google address search are implemented; a moderation queue is not.
+- Google Maps and Places require valid restricted browser configuration, billing and enabled APIs.
+  Automated browser/map/search traffic can incur provider charges; application rate limits do not
+  directly limit requests to Google.
 - No QR code image; a copyable share link (`?lat=&lon=`) covers the same acceptance criterion.
-- Browser smoke checks passed at a 390x844 mobile viewport with a working hosted map worker
+- Earlier MapLibre browser smoke checks passed at a 390x844 mobile viewport with a working hosted map worker
   and no horizontal overflow. Cognito's sign-in redirect was exercised, but no real account
   sign-in/claim/approval flow or physical-device pass has been completed.
 

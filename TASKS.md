@@ -86,10 +86,13 @@ _(This section is updated as implementation proceeds; see bottom of README for f
   id (`<houseId>::<claimantUserId>`). The organizer screen currently takes that id as manual
   input. A proper review-queue endpoint should ship alongside Milestone 4's duplicate-review
   queue (same "organizer needs a worklist" shape).
-- **No real geocoder.** `POST /houses/resolve` trusts a client-supplied `point` instead of
-  geocoding the street address itself (Amazon Location Service place search was deferred per the
-  plan's Hour-1 guidance to use a mock adapter if setup would delay the POC). The resident
-  dashboard and Find/Join screen both expose raw lat/lon inputs as a stand-in.
+- **No server-side address verification.** Google Places address search is now available in the
+  map, Find/Join, creation and resident screens. Residents confirm their house marker and select
+  the containing neighborhood. `POST /houses/resolve` still trusts client-supplied address/point
+  data; self-reported claims require organizer approval.
+- **No neighborhood-review activation UI.** The click-to-draw creation screen saves through the
+  existing validated/deduplicated API. Overlapping boundaries can enter `pending_review`; the
+  public lookup and resident selector only include active neighborhoods.
 - **Deployment does not imply full acceptance verification.** See README "Deployment" and
   "Manual smoke-test checklist" for infrastructure smoke checks versus remaining real-user QA.
   The deployed database starts empty; an authenticated organizer must create the first neighborhood.

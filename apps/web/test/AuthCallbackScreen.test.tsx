@@ -4,7 +4,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 const mocks = vi.hoisted(() => ({ exchange: vi.fn(), refresh: vi.fn() }));
-vi.mock("../src/auth/cognito", () => ({ exchangeCodeForTokens: mocks.exchange }));
+vi.mock("../src/auth/cognito", () => ({ exchangeCodeForTokens: mocks.exchange, consumeSignInReturnPath: () => "/dashboard" }));
 vi.mock("../src/auth/AuthContext", () => ({ useAuth: () => ({ refresh: mocks.refresh }) }));
 import { AuthCallbackScreen } from "../src/screens/AuthCallbackScreen";
 

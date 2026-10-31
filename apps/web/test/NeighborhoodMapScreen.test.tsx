@@ -1,15 +1,27 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import type { MapViewProps } from "../src/map/MapAdapter";
 
-vi.mock("../src/map/MapLibreMap", () => ({
-  MapLibreMap: () => <div data-testid="mock-map" />,
+vi.mock("../src/map/GoogleMap", () => ({
+  GoogleMap: ({ center }: MapViewProps) => <div data-testid="mock-map" data-lat={center.lat} data-lon={center.lon} />,
 }));
+vi.mock("../src/map/AddressSearch", () => ({ AddressSearch: () => <div /> }));
+vi.mock("../src/lib/api", async () => {
+  const { SEED_NEIGHBORHOOD, SEED_HOUSE_PINS } = await import("../src/lib/fixtures");
+  return {
+    fetchNeighborhoodsNear: vi.fn().mockResolvedValue([SEED_NEIGHBORHOOD]),
+    fetchNeighborhoodHouses: vi.fn().mockResolvedValue(SEED_HOUSE_PINS),
+  };
+});
+import { fetchNeighborhoodsNear } from "../src/lib/api";
 
 import { NeighborhoodMapScreen } from "../src/screens/NeighborhoodMapScreen";
 
 afterEach(() => {
   cleanup();
+  vi.clearAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("NeighborhoodMapScreen", () => {
@@ -23,5 +35,24 @@ describe("NeighborhoodMapScreen", () => {
     expect(await screen.findByText("Maple Hollow")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText(/houses? opted in/)).toBeInTheDocument());
     expect(screen.getByTestId("mock-map")).toBeInTheDocument();
+  });
+
+  it("honors shared coordinates instead of requesting the user's location", async () => {
+    const locate = vi.fn();
+    vi.stubGlobal("navigator", { geolocation: { getCurrentPosition: locate } });
+    render(<MemoryRouter initialEntries={["/?lat=10&lon=20"]}><NeighborhoodMapScreen /></MemoryRouter>);
+    await waitFor(() => expect(fetchNeighborhoodsNear).toHaveBeenCalledWith(10, 20));
+    expect(screen.getByTestId("mock-map")).toHaveAttribute("data-lat", "10");
+    expect(locate).not.toHaveBeenCalled();
+  });
+
+  it("uses location results to update both map and neighborhood lookup", async () => {
+    vi.stubGlobal("navigator", { geolocation: {
+      getCurrentPosition: (success: PositionCallback) => success({ coords: { latitude: 11, longitude: 22 } } as GeolocationPosition),
+    } });
+    render(<MemoryRouter><NeighborhoodMapScreen /></MemoryRouter>);
+    fireEvent.click(screen.getByRole("button", { name: "Use my location" }));
+    await waitFor(() => expect(fetchNeighborhoodsNear).toHaveBeenCalledWith(11, 22));
+    expect(screen.getByTestId("mock-map")).toHaveAttribute("data-lon", "22");
   });
 });

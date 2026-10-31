@@ -2,6 +2,9 @@ import { useState, type FormEvent } from "react";
 import type { PublicNeighborhood } from "@candy-map/shared";
 import { isPointInPolygon } from "@candy-map/shared";
 import { fetchNeighborhoodsNear } from "../lib/api";
+import { Link } from "react-router-dom";
+import { AddressSearch } from "../map/AddressSearch";
+import { parsePoint, useLocation } from "../map/useLocation";
 
 interface ResultRow {
   neighborhood: PublicNeighborhood;
@@ -14,6 +17,9 @@ export function FindJoinNeighborhoodScreen() {
   const [results, setResults] = useState<ResultRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
+  const { locating, locationError, locate } = useLocation((point) => {
+    setLat(String(point.lat)); setLon(String(point.lon)); void search(point.lat, point.lon);
+  });
 
   async function search(searchLat: number, searchLon: number) {
     setLoading(true);
@@ -36,26 +42,12 @@ export function FindJoinNeighborhoodScreen() {
 
   function onSubmit(event: FormEvent) {
     event.preventDefault();
-    const parsedLat = Number.parseFloat(lat);
-    const parsedLon = Number.parseFloat(lon);
-    if (Number.isNaN(parsedLat) || Number.isNaN(parsedLon)) return;
-    void search(parsedLat, parsedLon);
-  }
-
-  function useMyLocation() {
-    setGeoError(null);
-    if (!("geolocation" in navigator)) {
-      setGeoError("Geolocation is not available in this browser.");
+    const point = parsePoint(lat, lon);
+    if (!point) {
+      setGeoError("Enter valid latitude and longitude.");
       return;
     }
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLat(String(position.coords.latitude));
-        setLon(String(position.coords.longitude));
-        void search(position.coords.latitude, position.coords.longitude);
-      },
-      () => setGeoError("Could not get your location — enter coordinates manually."),
-    );
+    void search(point.lat, point.lon);
   }
 
   return (
@@ -63,9 +55,12 @@ export function FindJoinNeighborhoodScreen() {
       <h2>Find or join a neighborhood</h2>
       <p className="muted">
         Enter a point (or use your location) to see which neighborhood contains it and any nearby
-        ones. Address search will use Amazon Location Service / MapLibre place search in a later
-        milestone — this POC accepts raw coordinates.
+        ones. Search an address, use your location, or enter coordinates.
       </p>
+      <AddressSearch onSelect={({ point }) => {
+        setLat(String(point.lat)); setLon(String(point.lon)); void search(point.lat, point.lon);
+      }} />
+      <Link to="/neighborhoods/new">Add a neighborhood</Link>
       <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
         <div className="field">
           <label htmlFor="lat">Latitude</label>
@@ -79,12 +74,12 @@ export function FindJoinNeighborhoodScreen() {
           <button type="submit" className="btn">
             Search
           </button>
-          <button type="button" className="btn btn--secondary" onClick={useMyLocation}>
-            Use my location
+          <button type="button" className="btn btn--secondary" onClick={locate} disabled={locating}>
+            {locating ? "Locating..." : "Use my location"}
           </button>
         </div>
       </form>
-      {geoError && <p className="muted">{geoError}</p>}
+      {(geoError || locationError) && <p className="muted" role="alert">{geoError || locationError}</p>}
       {loading && <p className="muted">Searching…</p>}
       {results && results.length === 0 && <p className="muted">No neighborhoods found near that point.</p>}
       {results?.map(({ neighborhood, contains }) => (
@@ -96,6 +91,8 @@ export function FindJoinNeighborhoodScreen() {
           <p className="muted">
             Residents inside this boundary can sign in and claim their house from the dashboard.
           </p>
+          <Link to={`/?neighborhood=${encodeURIComponent(neighborhood.id)}&lat=${neighborhood.centroid.lat}&lon=${neighborhood.centroid.lon}`}>View map</Link>{" "}
+          <Link to={`/dashboard?neighborhood=${encodeURIComponent(neighborhood.id)}&lat=${neighborhood.centroid.lat}&lon=${neighborhood.centroid.lon}`}>Associate my house</Link>
         </div>
       ))}
     </div>

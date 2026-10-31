@@ -9,9 +9,8 @@
  *    between two simultaneous submissions is resolved by re-reading the winning house rather than
  *    erroring or creating a duplicate.
  *
- * Mock adapter note: this POC has no real geocoder (Amazon Location Service place search) wired
- * up yet — the caller supplies `point` directly. Swap in a real geocode-and-confirm step before
- * trusting client-supplied coordinates in production; see README "Known limitations".
+ * Google Places assists address selection in the UI, but the caller still supplies `point`
+ * directly. This endpoint does not verify the address or ownership; see README limitations.
  */
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
 import { GetCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";

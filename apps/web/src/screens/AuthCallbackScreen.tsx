@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { exchangeCodeForTokens } from "../auth/cognito";
+import { consumeSignInReturnPath, exchangeCodeForTokens } from "../auth/cognito";
 import { useAuth } from "../auth/AuthContext";
 
 export function AuthCallbackScreen() {
@@ -29,7 +29,7 @@ export function AuthCallbackScreen() {
         return;
       }
       refresh();
-      navigate("/dashboard", { replace: true });
+      navigate(consumeSignInReturnPath(), { replace: true });
     }).catch((err: unknown) => {
       if (active) setError(err instanceof Error ? err.message : "Sign-in request failed.");
     });

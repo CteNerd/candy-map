@@ -13,6 +13,7 @@ const REDIRECT_URI = `${window.location.origin}/auth/callback`;
 const SESSION_KEYS = {
   codeVerifier: "candy-map.auth.code_verifier",
   state: "candy-map.auth.state",
+  returnTo: "candy-map.auth.return_to",
   idToken: "candy-map.auth.id_token",
   accessToken: "candy-map.auth.access_token",
   refreshToken: "candy-map.auth.refresh_token",
@@ -33,6 +34,7 @@ export async function redirectToSignIn(): Promise<void> {
   const state = generateState();
   sessionStorage.setItem(SESSION_KEYS.codeVerifier, codeVerifier);
   sessionStorage.setItem(SESSION_KEYS.state, state);
+  sessionStorage.setItem(SESSION_KEYS.returnTo, window.location.pathname + window.location.search);
 
   const codeChallenge = await generateCodeChallenge(codeVerifier);
   const params = new URLSearchParams({
@@ -96,6 +98,12 @@ export function clearTokens(): void {
 
 export function getIdToken(): string | null {
   return sessionStorage.getItem(SESSION_KEYS.idToken);
+}
+
+export function consumeSignInReturnPath(): string {
+  const path = sessionStorage.getItem(SESSION_KEYS.returnTo);
+  sessionStorage.removeItem(SESSION_KEYS.returnTo);
+  return path?.startsWith("/") && !path.startsWith("//") && !path.startsWith("/auth/") ? path : "/dashboard";
 }
 
 /**
