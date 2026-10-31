@@ -10,6 +10,7 @@ const stack = new cdk.Stack(app, "CandyMapDeployment", {
 });
 const localPrincipal = new cdk.CfnParameter(stack, "LocalPrincipalArn", { type: "String" });
 const repository = new cdk.CfnParameter(stack, "GitHubRepository", { type: "String", default: "CteNerd/candy-map" });
+const subjectPrefix = new cdk.CfnParameter(stack, "GitHubSubjectPrefix", { type: "String" });
 const apiId = new cdk.CfnParameter(stack, "ApiId", { type: "String", default: "*" });
 const poolId = new cdk.CfnParameter(stack, "UserPoolId", { type: "String", default: "*" });
 const distributionId = new cdk.CfnParameter(stack, "DistributionId", { type: "String", default: "*" });
@@ -134,7 +135,7 @@ const githubRole = new iam.Role(stack, "GitHubRole", {
     arn("iam", "oidc-provider/token.actions.githubusercontent.com", ""),
     { StringEquals: {
       "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-      "token.actions.githubusercontent.com:sub": `repo:${repository.valueAsString}:environment:production`,
+      "token.actions.githubusercontent.com:sub": `${subjectPrefix.valueAsString}:environment:production`,
     } },
     "sts:AssumeRoleWithWebIdentity",
   ),
@@ -153,3 +154,4 @@ new cdk.CfnOutput(stack, "LocalDeployRoleArn", { value: localRole.roleArn });
 new cdk.CfnOutput(stack, "GitHubDeployRoleArn", { value: githubRole.roleArn });
 new cdk.CfnOutput(stack, "ExecutionRoleArn", { value: executionRole.roleArn });
 cdk.Tags.of(stack).add("Project", "candy-map");
+cdk.Tags.of(stack).add("Repository", repository.valueAsString, { excludeResourceTypes: ["aws:cdk:stack"] });

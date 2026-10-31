@@ -28,7 +28,7 @@ Single-table DynamoDB design — see
 - Repository: [CteNerd/candy-map](https://github.com/CteNerd/candy-map)
 - Deployment region: `us-east-1`.
 
-Requires Node 22+, npm, AWS CLI v2, and an existing AWS GitHub OIDC provider
+Requires Node 22+, npm, AWS CLI v2, authenticated GitHub CLI for setup, and an existing AWS GitHub OIDC provider
 (`token.actions.githubusercontent.com`, audience `sts.amazonaws.com`). All commands below
 run from the repository root. No AWS access keys are stored in GitHub.
 
@@ -104,6 +104,8 @@ requires an intentional privileged setup change; ordinary code deployments do no
   service-specific permissions; generated resource CRUD scopes are tightened after provisioning.
   Trusted deployers can create new resources within those services, but have no AdministratorAccess.
 - GitHub trust requires the exact repository's `production` environment and the STS audience.
+  Setup reads the repository's actual subject prefix through GitHub CLI, including immutable
+  owner/repository IDs when enabled; it does not assume the legacy name-only subject format.
   Configure that environment's deployment branch policy to permit only `main`.
 - Set environment variables `AWS_ACCOUNT_ID`, `AWS_REGION`, and `AWS_DEPLOY_ROLE_ARN` (the
   `GitHubDeployRoleArn` setup output). They are identifiers, not secrets.

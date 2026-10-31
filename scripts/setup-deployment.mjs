@@ -10,7 +10,15 @@ if (!process.env.AWS_ACCOUNT_ID || identity.Account !== process.env.AWS_ACCOUNT_
 const region = process.env.AWS_REGION;
 if (!region) throw new Error("Set AWS_REGION explicitly.");
 if (!identity.Arn.includes(":user/")) throw new Error("Setup requires the approved IAM user identity for local role trust.");
-const parameters = [`LocalPrincipalArn=${identity.Arn}`, `GitHubRepository=${process.env.GITHUB_REPOSITORY ?? "CteNerd/candy-map"}`];
+const repository = process.env.GITHUB_REPOSITORY ?? "CteNerd/candy-map";
+const oidc = JSON.parse(execFileSync("gh", ["api", `repos/${repository}/actions/oidc/customization/sub`], { encoding: "utf8" }));
+if (!oidc.use_default) throw new Error("Custom GitHub OIDC subject templates are not supported by this setup.");
+const subjectPrefix = oidc.use_immutable_subject ? oidc.sub_claim_prefix : `repo:${repository}`;
+if (typeof subjectPrefix !== "string" || !subjectPrefix.startsWith("repo:")) {
+  throw new Error("GitHub did not return a valid repository OIDC subject prefix.");
+}
+const parameters = [`LocalPrincipalArn=${identity.Arn}`, `GitHubRepository=${repository}`,
+  `GitHubSubjectPrefix=${subjectPrefix}`];
 if (process.argv.includes("--tighten")) {
   const hosting = aws(["cloudformation", "describe-stacks", "--stack-name", "CandyMapHosting"]).Stacks[0];
   const backend = aws(["cloudformation", "describe-stacks", "--stack-name", "CandyMapStack"]).Stacks[0];
