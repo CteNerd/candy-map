@@ -84,6 +84,11 @@ export interface CandyParticipation {
   publicOptIn: boolean;
 }
 
+/** Private /me/claims projection, including this season's saved candy status. */
+export interface MyHouseClaim extends HouseClaim {
+  participation: CandyParticipation | null;
+}
+
 export type ModerationState = "pending" | "accepted" | "rejected";
 
 export interface CandyReport {

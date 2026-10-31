@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { isPointInPolygon, type CandyStatus, type HouseClaim, type PublicNeighborhood } from "@candy-map/shared";
+import { isPointInPolygon, type CandyParticipation, type CandyStatus, type HouseClaim, type PublicNeighborhood } from "@candy-map/shared";
 import { useAuth } from "../auth/AuthContext";
 import { fetchMyClaims, fetchNeighborhoodsNear, isLiveApiConfigured, resolveHouse, submitClaim, toggleCandyStatus } from "../lib/api";
 import { GoogleMap } from "../map/GoogleMap";
@@ -8,11 +8,15 @@ import { AddressSearch } from "../map/AddressSearch";
 import { DEFAULT_CENTER, parsePoint, useLocation } from "../map/useLocation";
 
 const STATUS_OPTIONS: CandyStatus[] = ["available", "low", "finished"];
+const STATUS_LABELS: Record<CandyStatus, string> = { available: "Available", low: "Running low", finished: "Finished" };
 
 export function ResidentDashboard() {
   const { user, isConfigured, signIn, signOut } = useAuth();
   const [params] = useSearchParams();
   const [claim, setClaim] = useState<HouseClaim | null>(null);
+  const [participation, setParticipation] = useState<CandyParticipation | null>(null);
+  const [savingStatus, setSavingStatus] = useState<CandyStatus | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [street, setStreet] = useState("");
   const [unit, setUnit] = useState("");
   const [postalCode, setPostalCode] = useState("");
@@ -39,7 +43,10 @@ export function ResidentDashboard() {
     fetchMyClaims()
       .then((claims) => {
         const mine = claims.find((item) => item.status === "approved") ?? claims.find((item) => item.status !== "rejected");
-        if (active && mine) setClaim(mine);
+        if (active && mine) {
+          setClaim(mine);
+          setParticipation(mine.participation ?? null);
+        }
       })
       .catch((err: unknown) => { if (active) setError(err instanceof Error ? err.message : "Could not restore your claims."); })
       .finally(() => { if (active) setClaimLoading(false); });
@@ -131,12 +138,17 @@ export function ResidentDashboard() {
     }
     setBusy(true);
     setError(null);
+    setSavingStatus(status);
+    setSaveMessage(null);
     try {
-      await toggleCandyStatus(claim.houseId, { status, publicOptIn: true });
+      const saved = await toggleCandyStatus(claim.houseId, { status, publicOptIn: true });
+      setParticipation(saved);
+      setSaveMessage(`Saved: ${STATUS_LABELS[saved.status]}.`);
     } catch (err) {
-      setError((err as Error).message);
+      setError(err instanceof Error ? err.message : "Could not save candy status.");
     } finally {
       setBusy(false);
+      setSavingStatus(null);
     }
   }
 
@@ -226,13 +238,24 @@ export function ResidentDashboard() {
       {claim && claim.status === "approved" && (
         <div className="card">
           <strong>Candy status</strong>
+          <p className="muted">
+            {participation ? `Last saved status: ${STATUS_LABELS[participation.status]}.` : "No candy status saved yet."}
+          </p>
+          {participation && <p className="muted">
+            {participation.publicOptIn
+              ? `Update expires: ${new Date(participation.expiresAt).toLocaleString()}. Finished houses are hidden from the public map.`
+              : "This saved status is not public. Select a status to publish a new update."}
+          </p>}
           <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
             {STATUS_OPTIONS.map((status) => (
-              <button key={status} className="btn btn--secondary" disabled={busy} onClick={() => onToggleStatus(status)}>
-                {status}
+              <button key={status}
+                className={`btn btn--secondary${participation?.status === status ? ` candy-status--${status}` : ""}`}
+                aria-pressed={participation?.status === status} disabled={busy} onClick={() => onToggleStatus(status)}>
+                {savingStatus === status ? "Saving..." : STATUS_LABELS[status]}
               </button>
             ))}
           </div>
+          {saveMessage && <p role="status">{saveMessage}</p>}
         </div>
       )}
     </div>

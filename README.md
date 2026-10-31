@@ -121,6 +121,10 @@ house**, search the house address, select the neighborhood, and confirm the mark
 boundary. Claims remain self-reported until approved. The pending-claim card links to the organizer
 approval screen with its claim ID filled in; only that neighborhood's organizer can approve it.
 After approval, return to Resident and explicitly select a candy status to opt into the public map.
+The Resident dashboard restores this season's last saved candy status from the private
+`GET /me/claims` response, highlights the selected button, and confirms successful saves.
+Failed saves retain the previous selection. Finished/expired statuses remain visible to the
+resident even when excluded from the public map.
 Overlapping neighborhoods may be pending review and cannot be selected in the active-neighborhood
 house workflow until activated. A review queue/activation UI is still missing.
 
@@ -166,6 +170,18 @@ browser permission is already granted. **Use my location** requests permission e
 Search an address, or pan and choose **Search this area**, to load nearby neighborhoods. Location
 denial/timeouts and map/search failures are visible. Address search retrieves only location and
 address components; it does not establish house ownership.
+
+### Sharing previews
+
+The static HTML includes Open Graph and large-image card metadata, so message apps can fetch
+the Candy Map title, description and branded `apps/web/public/share-card.png` without running
+JavaScript. Neighborhood links retain their coordinates/selection; previews use the same public
+branding rather than exposing resident details. Message apps control rendering and may cache
+earlier previews, so already-sent messages may not update after deployment.
+
+The CloudFront hostname remains the site address until a custom domain and matching TLS
+certificate are configured. If that changes, update the absolute preview-image URLs in
+`apps/web/index.html` along with Google key restrictions, API CORS and Cognito callbacks.
 
 ## AWS resources & cost cautions
 

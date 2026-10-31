@@ -146,7 +146,7 @@ export class CandyMapStack extends cdk.Stack {
     table.grant(resolveHouseFn, "dynamodb:GetItem", "dynamodb:PutItem");
     table.grant(submitClaimFn, "dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem");
     table.grant(toggleCandyStatusFn, "dynamodb:GetItem", "dynamodb:PutItem");
-    table.grant(getMyClaimsFn, "dynamodb:Query");
+    table.grant(getMyClaimsFn, "dynamodb:Query", "dynamodb:GetItem");
     table.grant(approveClaimFn, "dynamodb:GetItem", "dynamodb:PutItem");
     table.grant(reportHouseFn, "dynamodb:GetItem", "dynamodb:PutItem");
 

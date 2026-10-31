@@ -1,5 +1,5 @@
 /** Local fixtures are used only when no live API is configured. */
-import type { CandyParticipation, CandyStatus, House, HouseClaim, Neighborhood, PolygonGeoJSON, PublicNeighborhood, PublicHousePin } from "@candy-map/shared";
+import type { CandyParticipation, CandyStatus, House, HouseClaim, MyHouseClaim, Neighborhood, PolygonGeoJSON, PublicNeighborhood, PublicHousePin } from "@candy-map/shared";
 import { SEED_HOUSE_PINS, SEED_NEIGHBORHOOD } from "./fixtures";
 import { getIdToken } from "../auth/cognito";
 
@@ -85,7 +85,7 @@ export function toggleCandyStatus(
   return authenticatedFetch(`/houses/${houseId}/candy`, { method: "PATCH", body: JSON.stringify(body) });
 }
 
-export function fetchMyClaims(): Promise<HouseClaim[]> {
+export function fetchMyClaims(): Promise<MyHouseClaim[]> {
   return authenticatedFetch("/me/claims");
 }
 

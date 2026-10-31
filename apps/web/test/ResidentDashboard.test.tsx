@@ -5,6 +5,10 @@ import { MemoryRouter } from "react-router-dom";
 import { SEED_NEIGHBORHOOD } from "../src/lib/fixtures";
 
 const useAuthMock = vi.fn();
+const savedParticipation = {
+  houseId: "restored-house", seasonId: "2026", status: "available" as const,
+  publicOptIn: true, updatedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+};
 vi.mock("../src/auth/AuthContext", () => ({ useAuth: () => useAuthMock() }));
 vi.mock("../src/lib/api", () => ({
   fetchMyClaims: vi.fn().mockResolvedValue([]),
@@ -62,10 +66,49 @@ describe("ResidentDashboard", () => {
     vi.mocked(fetchMyClaims).mockResolvedValue([{
       houseId: "restored-house", userId: "resident-1", status: "approved",
       verificationLevel: "organizer_approved", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      participation: null,
+    }]);
+    vi.mocked(toggleCandyStatus).mockResolvedValue(savedParticipation);
+    renderDashboard();
+    fireEvent.click(await screen.findByRole("button", { name: "Available" }));
+    await waitFor(() => expect(toggleCandyStatus).toHaveBeenCalledWith("restored-house", { status: "available", publicOptIn: true }));
+    expect(await screen.findByText("Saved: Available.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Available" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it.each(["available", "low", "finished"] as const)("restores the saved %s selection on return to Resident", async (status) => {
+    useAuthMock.mockReturnValue({ user: { sub: "resident-1" }, isConfigured: true, signIn: vi.fn(), signOut: vi.fn() });
+    vi.mocked(isLiveApiConfigured).mockReturnValue(true);
+    vi.mocked(fetchMyClaims).mockResolvedValue([{
+      houseId: "restored-house", userId: "resident-1", status: "approved",
+      verificationLevel: "organizer_approved", createdAt: "now", updatedAt: "now",
+      participation: { ...savedParticipation, status },
     }]);
     renderDashboard();
-    fireEvent.click(await screen.findByRole("button", { name: "available" }));
-    await waitFor(() => expect(toggleCandyStatus).toHaveBeenCalledWith("restored-house", { status: "available", publicOptIn: true }));
+    const label = { available: "Available", low: "Running low", finished: "Finished" }[status];
+    expect(await screen.findByRole("button", { name: label })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getAllByRole("button", { pressed: true })).toHaveLength(1);
+    expect(toggleCandyStatus).not.toHaveBeenCalled();
+  });
+
+  it("keeps the previous selection during a save and after a failed save", async () => {
+    useAuthMock.mockReturnValue({ user: { sub: "resident-1" }, isConfigured: true, signIn: vi.fn(), signOut: vi.fn() });
+    vi.mocked(isLiveApiConfigured).mockReturnValue(true);
+    vi.mocked(fetchMyClaims).mockResolvedValue([{
+      houseId: "restored-house", userId: "resident-1", status: "approved",
+      verificationLevel: "organizer_approved", createdAt: "now", updatedAt: "now", participation: savedParticipation,
+    }]);
+    let rejectSave!: (reason: Error) => void;
+    vi.mocked(toggleCandyStatus).mockReturnValue(new Promise((_resolve, reject) => { rejectSave = reject; }));
+    renderDashboard();
+    fireEvent.click(await screen.findByRole("button", { name: "Running low" }));
+    expect(screen.getByRole("button", { name: "Saving..." })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Available" })).toHaveAttribute("aria-pressed", "true");
+    rejectSave(new Error("Could not reach the server"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not reach the server");
+    expect(screen.getByRole("button", { name: "Available" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Running low" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByText(/^Saved:/)).not.toBeInTheDocument();
   });
 
   it("associates a confirmed house with the selected containing neighborhood", async () => {
