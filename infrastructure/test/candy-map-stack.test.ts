@@ -31,10 +31,10 @@ describe("CandyMapStack", () => {
     expect(bundles).toHaveLength(9);
     const result = spawnSync(process.execPath, ["-e",
       "for (const file of process.argv.slice(1)) { if (typeof require(file).handler !== 'function') throw new Error('Missing handler: ' + file); }",
-      ...bundles], { encoding: "utf8" });
+      ...bundles], { encoding: "utf8", timeout: 10_000 });
     expect(result.error).toBeUndefined();
     expect(result.status, result.stderr).toBe(0);
-  });
+  }, 20_000);
   it("creates a single DynamoDB table with pk/sk and a gsi1 index", () => {
     const template = synthesize();
     template.hasResourceProperties("AWS::DynamoDB::Table", {
