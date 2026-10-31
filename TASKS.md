@@ -7,12 +7,13 @@ unfinished acceptance criteria" at the bottom — nothing is silently dropped.
 ## Milestone 1 — Scaffold (vertical slice: static map + seeded neighborhood)
 - [x] Monorepo layout: `apps/web`, `services/api`, `infrastructure`, `packages/shared`
 - [x] Root workspace config, base `tsconfig`, `.gitignore`
-- [ ] `packages/shared`: core types + geo utils (address normalization, polygon validation,
-      overlap/containment, point-in-polygon) with unit tests
-- [ ] `apps/web`: Vite + React + TS scaffold, mobile-first layout, map adapter (MapLibre, with
+- [x] `packages/shared`: core types + geo utils (address normalization, polygon validation,
+      overlap/containment, point-in-polygon) with unit tests (37 passing)
+- [x] `apps/web`: Vite + React + TS scaffold, mobile-first layout, map adapter (MapLibre, with
       documented swap point for Amazon Location Service), one seeded neighborhood polygon + static
       seeded candy pins rendered from local fixture data
-- [ ] Build passes for web app
+- [x] Build passes for web app (typecheck, vite build, 8 vitest smoke/unit tests, lint clean;
+      manually verified in-browser: boundary polygon, 4 pins, and all 4 nav screens render)
 
 ## Milestone 2 — Public API (read path)
 - [ ] `infrastructure`: CDK app — DynamoDB tables (Neighborhood, House, Membership, Claim,

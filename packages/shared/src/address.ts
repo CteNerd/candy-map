@@ -4,9 +4,11 @@
  * Per COPILOT_PLAN.md "House duplicate prevention": canonical key = provider-standardized address
  * identifier when available; fallback to normalized street address + unit + postal code + country.
  * Never use raw lat/lon alone as the unique identity.
+ *
+ * Deliberately avoids `node:crypto` here: this package is bundled into the browser (web app) as
+ * well as the Lambda handlers, and the fallback key only needs to be a stable, collision-resistant
+ * dedupe key — not a cryptographic hash.
  */
-
-import { createHash } from "node:crypto";
 
 export interface ParsedAddress {
   street: string;
@@ -98,6 +100,21 @@ export function normalizeAddress(input: {
 }
 
 /**
+ * Deterministic, dependency-free 64-bit FNV-1a hash, rendered as hex. Not cryptographic — only
+ * used to turn a normalized composite address string into a fixed-length dedupe key.
+ */
+function fnv1aHash(input: string): string {
+  let hash = 0xcbf29ce484222325n;
+  const prime = 0x100000001b3n;
+  const mask64 = 0xffffffffffffffffn;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= BigInt(input.charCodeAt(i));
+    hash = (hash * prime) & mask64;
+  }
+  return hash.toString(16).padStart(16, "0");
+}
+
+/**
  * Derives the canonical house identity key. If a geocoding provider gives us a stable
  * standardized address identifier (e.g. a place ID), prefer that — it's passed through verbatim
  * with a `provider:` prefix so it can never collide with the fallback composite key. Otherwise
@@ -117,6 +134,5 @@ export function canonicalAddressKey(input: {
   const composite = [normalized.street, normalized.unit ?? "", normalized.postalCode, normalized.country].join(
     "|",
   );
-  const hash = createHash("sha256").update(composite).digest("hex").slice(0, 32);
-  return `fallback:${hash}`;
+  return `fallback:${fnv1aHash(composite)}`;
 }
