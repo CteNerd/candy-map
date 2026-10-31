@@ -25,11 +25,11 @@ unfinished acceptance criteria" at the bottom — nothing is silently dropped.
 - [x] Polygon validation logic (closed/non-self-intersecting, reasonable area, inside supported
       region) — implemented and unit-tested in `packages/shared` (Milestone 1); reused server-side
       by the `POST /neighborhoods` handler once it's wired up below
-- [ ] `POST /neighborhoods` endpoint itself: deliberately **deferred to Milestone 3/4**, alongside
-      the Cognito organizer authorizer and overlap-dedupe reservation — an unauthenticated,
-      dedupe-free create endpoint would violate "every write checks authorization server-side" and
-      "prevent duplicate neighborhood creation." The plan's own Hour 4 note explicitly allows
-      cutting "automated neighborhood creation" before cutting authorization/privacy.
+- [x] `POST /neighborhoods` endpoint itself: deliberately **deferred to Milestone 3/4** at the
+      time this bullet was written — an unauthenticated, dedupe-free create endpoint would have
+      violated "every write checks authorization server-side" and "prevent duplicate neighborhood
+      creation." It landed once both were ready: authenticated in Milestone 3, overlap-dedupe in
+      Milestone 4.
 - [x] Web app fetches from the real public API instead of static fixtures (adapter-based, so it
       still falls back to fixtures if API is unreachable) — already supported by `lib/api.ts`
       (Milestone 1); set `VITE_API_BASE_URL` once the stack is deployed to switch over
