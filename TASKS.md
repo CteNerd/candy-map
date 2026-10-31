@@ -16,19 +16,30 @@ unfinished acceptance criteria" at the bottom — nothing is silently dropped.
       manually verified in-browser: boundary polygon, 4 pins, and all 4 nav screens render)
 
 ## Milestone 2 — Public API (read path)
-- [ ] `infrastructure`: CDK app — DynamoDB tables (Neighborhood, House, Membership, Claim,
-      Participation, Report, Audit), API Gateway HTTP API, Lambda functions, least-privilege IAM
-- [ ] `services/api`: `GET /neighborhoods?lat=&lon=`, `GET /neighborhoods/{id}/houses` (opted-in,
-      active only; no PII)
-- [ ] `POST /neighborhoods` validation: closed/non-self-intersecting polygon, reasonable area,
-      inside supported region (server-side, using `packages/shared`)
-- [ ] Web app fetches from the real public API instead of static fixtures (adapter-based, so it
-      still falls back to fixtures if API is unreachable)
-- [ ] Unit tests for Lambda handlers (mocked DynamoDB)
+- [x] `infrastructure`: CDK app — single-table DynamoDB (Neighborhood, House, Membership, Claim,
+      Participation, Report, Audit all in one table + `gsi1`), API Gateway HTTP API, 2 Lambda
+      functions, least-privilege IAM (verified via `cdk synth` + CDK assertions tests: 1 table, 2
+      functions, 2 routes, IAM policies scoped to exactly Scan/Query/GetItem — no write actions)
+- [x] `services/api`: `GET /neighborhoods?lat=&lon=`, `GET /neighborhoods/{id}/houses` (opted-in,
+      active only; no PII — returns `PublicNeighborhood`/`PublicHousePin` projections)
+- [x] Polygon validation logic (closed/non-self-intersecting, reasonable area, inside supported
+      region) — implemented and unit-tested in `packages/shared` (Milestone 1); reused server-side
+      by the `POST /neighborhoods` handler once it's wired up below
+- [ ] `POST /neighborhoods` endpoint itself: deliberately **deferred to Milestone 3/4**, alongside
+      the Cognito organizer authorizer and overlap-dedupe reservation — an unauthenticated,
+      dedupe-free create endpoint would violate "every write checks authorization server-side" and
+      "prevent duplicate neighborhood creation." The plan's own Hour 4 note explicitly allows
+      cutting "automated neighborhood creation" before cutting authorization/privacy.
+- [x] Web app fetches from the real public API instead of static fixtures (adapter-based, so it
+      still falls back to fixtures if API is unreachable) — already supported by `lib/api.ts`
+      (Milestone 1); set `VITE_API_BASE_URL` once the stack is deployed to switch over
+- [x] Unit tests for Lambda handlers (mocked DynamoDB via `aws-sdk-client-mock`, 6 passing)
 
 ## Milestone 3 — Auth, claims, candy toggle
 - [ ] Cognito User Pool (CDK) + JWT verification in Lambda/API Gateway authorizer
 - [ ] `POST /houses/resolve`, `POST /houses/claims`, `PATCH /houses/{id}/candy`, `GET /me/claims`
+- [ ] `POST /neighborhoods` (authenticated organizer, structural validation wired to the
+      authorizer; overlap-dedupe still pending until Milestone 4)
 - [ ] House dedupe: canonical address key, `HOUSE_KEY#<hash>` reservation item, atomic
       `TransactWriteItems`
 - [ ] Resident dashboard screen (claim + toggle status) gated behind sign-in

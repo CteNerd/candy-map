@@ -110,3 +110,27 @@ export interface PublicHousePin {
   status: CandyStatus;
   updatedAt: string;
 }
+
+/**
+ * Public projection of a Neighborhood. Omits `organizerIds` and `createdBy` — those are Cognito
+ * user ids, and "Public APIs must never return resident name, email, user ID, or claim details."
+ */
+export interface PublicNeighborhood {
+  id: string;
+  name: string;
+  polygon: PolygonGeoJSON;
+  bbox: BoundingBox;
+  centroid: GeoPoint;
+  status: NeighborhoodStatus;
+}
+
+export function toPublicNeighborhood(neighborhood: Neighborhood): PublicNeighborhood {
+  return {
+    id: neighborhood.id,
+    name: neighborhood.name,
+    polygon: neighborhood.polygon,
+    bbox: neighborhood.bbox,
+    centroid: neighborhood.centroid,
+    status: neighborhood.status,
+  };
+}
