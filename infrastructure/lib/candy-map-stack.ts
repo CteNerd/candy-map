@@ -6,12 +6,19 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as nodejs from "aws-cdk-lib/aws-lambda-nodejs";
 import * as apigw from "aws-cdk-lib/aws-apigatewayv2";
 import * as integrations from "aws-cdk-lib/aws-apigatewayv2-integrations";
+import * as authorizers from "aws-cdk-lib/aws-apigatewayv2-authorizers";
+import * as cognito from "aws-cdk-lib/aws-cognito";
 
 const API_HANDLERS_DIR = path.join(__dirname, "..", "..", "services", "api", "src", "handlers");
 
 export interface CandyMapStackProps extends cdk.StackProps {
   /** CORS origin allowed to call the public API. Defaults to "*" for the POC — restrict for prod. */
   allowedOrigin: string;
+  /**
+   * Globally-unique Cognito Hosted UI domain prefix. Must be changed before a real deployment —
+   * Cognito domain prefixes are unique across *all* AWS accounts in a region.
+   */
+  cognitoDomainPrefix?: string;
 }
 
 export class CandyMapStack extends cdk.Stack {
@@ -33,7 +40,46 @@ export class CandyMapStack extends cdk.Stack {
       sortKey: { name: "gsi1sk", type: dynamodb.AttributeType.STRING },
     });
 
-    // --- Lambda functions (public read path — Milestone 2) ----------------
+    // --- Authentication -----------------------------------------------------
+    const userPool = new cognito.UserPool(this, "CandyMapUserPool", {
+      selfSignUpEnabled: true,
+      signInAliases: { email: true },
+      autoVerify: { email: true },
+      standardAttributes: { email: { required: true, mutable: true } },
+      passwordPolicy: { minLength: 8, requireLowercase: true, requireUppercase: true, requireDigits: true },
+      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
+      removalPolicy: cdk.RemovalPolicy.DESTROY, // POC only.
+    });
+
+    // Cognito rejects "*" as a callback URL, so the wildcard POC default only gets a localhost
+    // callback — set a real `allowedOrigin` context value to get a working hosted-UI redirect.
+    const callbackUrls = [
+      ...(props.allowedOrigin === "*" ? [] : [`${props.allowedOrigin}/auth/callback`]),
+      "http://localhost:5173/auth/callback",
+    ];
+    const logoutUrls = [...(props.allowedOrigin === "*" ? [] : [props.allowedOrigin]), "http://localhost:5173"];
+
+    const userPoolClient = new cognito.UserPoolClient(this, "CandyMapUserPoolClient", {
+      userPool,
+      generateSecret: false, // public SPA client — no secret can be kept confidential in a browser.
+      authFlows: { userSrp: true },
+      oAuth: {
+        flows: { authorizationCodeGrant: true },
+        scopes: [cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL, cognito.OAuthScope.PROFILE],
+        callbackUrls,
+        logoutUrls,
+      },
+    });
+
+    const userPoolDomain = userPool.addDomain("CandyMapUserPoolDomain", {
+      cognitoDomain: { domainPrefix: props.cognitoDomainPrefix ?? "candy-map-poc" },
+    });
+
+    const authorizer = new authorizers.HttpUserPoolAuthorizer("CandyMapAuthorizer", userPool, {
+      userPoolClients: [userPoolClient],
+    });
+
+    // --- Lambda functions ---------------------------------------------------
     const commonEnvironment = {
       TABLE_NAME: table.tableName,
       ALLOWED_ORIGIN: props.allowedOrigin,
@@ -47,27 +93,39 @@ export class CandyMapStack extends cdk.Stack {
       externalModules: [],
     };
 
-    const getNeighborhoodsFn = new nodejs.NodejsFunction(this, "GetNeighborhoodsFn", {
-      entry: path.join(API_HANDLERS_DIR, "getNeighborhoods.ts"),
-      runtime: lambda.Runtime.NODEJS_22_X,
-      environment: commonEnvironment,
-      bundling,
-    });
+    const makeFn = (name: string, entryFile: string) =>
+      new nodejs.NodejsFunction(this, name, {
+        entry: path.join(API_HANDLERS_DIR, entryFile),
+        runtime: lambda.Runtime.NODEJS_22_X,
+        environment: commonEnvironment,
+        bundling,
+      });
 
-    const getNeighborhoodHousesFn = new nodejs.NodejsFunction(this, "GetNeighborhoodHousesFn", {
-      entry: path.join(API_HANDLERS_DIR, "getNeighborhoodHouses.ts"),
-      runtime: lambda.Runtime.NODEJS_22_X,
-      environment: commonEnvironment,
-      bundling,
-    });
+    // Public read path (Milestone 2)
+    const getNeighborhoodsFn = makeFn("GetNeighborhoodsFn", "getNeighborhoods.ts");
+    const getNeighborhoodHousesFn = makeFn("GetNeighborhoodHousesFn", "getNeighborhoodHouses.ts");
+
+    // Authenticated write path (Milestone 3)
+    const createNeighborhoodFn = makeFn("CreateNeighborhoodFn", "createNeighborhood.ts");
+    const resolveHouseFn = makeFn("ResolveHouseFn", "resolveHouse.ts");
+    const submitClaimFn = makeFn("SubmitClaimFn", "submitClaim.ts");
+    const toggleCandyStatusFn = makeFn("ToggleCandyStatusFn", "toggleCandyStatus.ts");
+    const getMyClaimsFn = makeFn("GetMyClaimsFn", "getMyClaims.ts");
+    const approveClaimFn = makeFn("ApproveClaimFn", "approveClaim.ts");
 
     // Least-privilege: each function only gets the DynamoDB actions it actually performs.
     table.grant(getNeighborhoodsFn, "dynamodb:Scan");
     table.grant(getNeighborhoodHousesFn, "dynamodb:Query", "dynamodb:GetItem");
+    table.grant(createNeighborhoodFn, "dynamodb:TransactWriteItems");
+    table.grant(resolveHouseFn, "dynamodb:GetItem", "dynamodb:TransactWriteItems");
+    table.grant(submitClaimFn, "dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem");
+    table.grant(toggleCandyStatusFn, "dynamodb:GetItem", "dynamodb:PutItem");
+    table.grant(getMyClaimsFn, "dynamodb:Query");
+    table.grant(approveClaimFn, "dynamodb:GetItem", "dynamodb:PutItem");
 
-    // --- Public HTTP API ----------------------------------------------------
+    // --- HTTP API -------------------------------------------------------
     const httpApi = new apigw.HttpApi(this, "CandyMapHttpApi", {
-      description: "Candy Map public API",
+      description: "Candy Map public + authenticated API",
       corsPreflight: {
         allowOrigins: [props.allowedOrigin],
         allowMethods: [apigw.CorsHttpMethod.GET, apigw.CorsHttpMethod.POST, apigw.CorsHttpMethod.PATCH],
@@ -75,12 +133,12 @@ export class CandyMapStack extends cdk.Stack {
       },
     });
 
+    // Public routes — no authorizer.
     httpApi.addRoutes({
       path: "/neighborhoods",
       methods: [apigw.HttpMethod.GET],
       integration: new integrations.HttpLambdaIntegration("GetNeighborhoodsIntegration", getNeighborhoodsFn),
     });
-
     httpApi.addRoutes({
       path: "/neighborhoods/{id}/houses",
       methods: [apigw.HttpMethod.GET],
@@ -90,7 +148,52 @@ export class CandyMapStack extends cdk.Stack {
       ),
     });
 
+    // Authenticated routes — every write checks authorization again inside the handler itself;
+    // this authorizer only proves *who* the caller is, not what they're allowed to do.
+    httpApi.addRoutes({
+      path: "/neighborhoods",
+      methods: [apigw.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration("CreateNeighborhoodIntegration", createNeighborhoodFn),
+      authorizer,
+    });
+    httpApi.addRoutes({
+      path: "/houses/resolve",
+      methods: [apigw.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration("ResolveHouseIntegration", resolveHouseFn),
+      authorizer,
+    });
+    httpApi.addRoutes({
+      path: "/houses/claims",
+      methods: [apigw.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration("SubmitClaimIntegration", submitClaimFn),
+      authorizer,
+    });
+    httpApi.addRoutes({
+      path: "/houses/{id}/candy",
+      methods: [apigw.HttpMethod.PATCH],
+      integration: new integrations.HttpLambdaIntegration("ToggleCandyStatusIntegration", toggleCandyStatusFn),
+      authorizer,
+    });
+    httpApi.addRoutes({
+      path: "/me/claims",
+      methods: [apigw.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration("GetMyClaimsIntegration", getMyClaimsFn),
+      authorizer,
+    });
+    httpApi.addRoutes({
+      path: "/admin/claims/{id}/approve",
+      methods: [apigw.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration("ApproveClaimIntegration", approveClaimFn),
+      authorizer,
+    });
+
     new cdk.CfnOutput(this, "ApiUrl", { value: httpApi.apiEndpoint });
     new cdk.CfnOutput(this, "TableName", { value: table.tableName });
+    new cdk.CfnOutput(this, "UserPoolId", { value: userPool.userPoolId });
+    new cdk.CfnOutput(this, "UserPoolClientId", { value: userPoolClient.userPoolClientId });
+    new cdk.CfnOutput(this, "CognitoHostedUiDomain", {
+      value: `https://${userPoolDomain.domainName}.auth.${this.region}.amazoncognito.com`,
+    });
   }
 }
+

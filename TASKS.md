@@ -36,14 +36,19 @@ unfinished acceptance criteria" at the bottom — nothing is silently dropped.
 - [x] Unit tests for Lambda handlers (mocked DynamoDB via `aws-sdk-client-mock`, 6 passing)
 
 ## Milestone 3 — Auth, claims, candy toggle
-- [ ] Cognito User Pool (CDK) + JWT verification in Lambda/API Gateway authorizer
-- [ ] `POST /houses/resolve`, `POST /houses/claims`, `PATCH /houses/{id}/candy`, `GET /me/claims`
-- [ ] `POST /neighborhoods` (authenticated organizer, structural validation wired to the
-      authorizer; overlap-dedupe still pending until Milestone 4)
-- [ ] House dedupe: canonical address key, `HOUSE_KEY#<hash>` reservation item, atomic
-      `TransactWriteItems`
-- [ ] Resident dashboard screen (claim + toggle status) gated behind sign-in
-- [ ] Organizer approval endpoint `POST /admin/claims/{id}/approve` + minimal organizer screen
+- [x] Cognito User Pool + public SPA client + Hosted UI domain (CDK); native HTTP API JWT
+      authorizer (`HttpUserPoolAuthorizer`) attached to every authenticated route (verified via
+      CDK assertions: public routes have `AuthorizationType: NONE`, all others `JWT`)
+- [x] `POST /houses/resolve`, `POST /houses/claims`, `PATCH /houses/{id}/candy`, `GET /me/claims`
+- [x] `POST /neighborhoods` (authenticated — any signed-in user creating one becomes its first
+      organizer; structural validation only, overlap-dedupe still pending until Milestone 4)
+- [x] House dedupe: canonical address key, `HOUSE_KEY#<hash>` reservation item, atomic
+      `TransactWriteItems`; concurrent-creation race resolves to the winning house instead of
+      erroring or duplicating (unit-tested)
+- [x] Resident dashboard screen (claim + toggle status) gated behind sign-in — real Cognito
+      Hosted UI redirect flow (OAuth2 Authorization Code + PKCE, public client, no secret)
+- [x] Organizer approval endpoint `POST /admin/claims/{id}/approve` + minimal organizer screen
+      (claim id entered manually — see "Known gaps" below)
 
 ## Milestone 4 — Duplicate-neighborhood checks, reports, hardening
 - [ ] Neighborhood overlap check (>=0.8 block, >=0.1 review queue) using bbox/grid candidates +
@@ -59,3 +64,15 @@ unfinished acceptance criteria" at the bottom — nothing is silently dropped.
 
 ## Known gaps / unfinished acceptance criteria
 _(This section is updated as implementation proceeds; see bottom of README for final status.)_
+- **No "list pending claims for a neighborhood" endpoint.** COPILOT_PLAN.md's API contract never
+  defines one — only `POST /admin/claims/{id}/approve`, which requires already knowing the claim
+  id (`<houseId>::<claimantUserId>`). The organizer screen currently takes that id as manual
+  input. A proper review-queue endpoint should ship alongside Milestone 4's duplicate-review
+  queue (same "organizer needs a worklist" shape).
+- **No real geocoder.** `POST /houses/resolve` trusts a client-supplied `point` instead of
+  geocoding the street address itself (Amazon Location Service place search was deferred per the
+  plan's Hour-1 guidance to use a mock adapter if setup would delay the POC). The resident
+  dashboard and Find/Join screen both expose raw lat/lon inputs as a stand-in.
+- **No deployment has been run.** This session has no AWS credentials, so everything below CDK
+  `synth`/unit tests (which run cleanly) has not been exercised against real AWS resources. See
+  README "Deployment steps" and "Manual smoke-test checklist".

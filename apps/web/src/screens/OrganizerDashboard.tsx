@@ -1,24 +1,75 @@
+import { useState, type FormEvent } from "react";
+import { useAuth } from "../auth/AuthContext";
+import { approveClaim } from "../lib/api";
+
 /**
- * Placeholder for Milestones 3-4 (organizer claim approval, duplicate-neighborhood review queue,
- * community report moderation). See TASKS.md Milestones 3-4 and README "Known limitations".
+ * Organizer claim approval is wired to the real `POST /admin/claims/{id}/approve` endpoint.
+ *
+ * Known gap: COPILOT_PLAN.md's API contract has no "list pending claims for a neighborhood"
+ * endpoint, so there's no backend to list *which* claims need review yet — an organizer currently
+ * needs the claim id (`<houseId>::<claimantUserId>`) out of band. Adding a proper review queue
+ * endpoint is tracked in TASKS.md Milestone 4 alongside the duplicate-neighborhood review queue.
  */
 export function OrganizerDashboard() {
+  const { user, isConfigured, signIn } = useAuth();
+  const [claimId, setClaimId] = useState("");
+  const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  if (!isConfigured) {
+    return (
+      <div className="screen">
+        <h2>Organizer dashboard</h2>
+        <div className="banner">Sign-in isn't configured yet — see README "Environment variables".</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="screen">
+        <h2>Organizer dashboard</h2>
+        <button className="btn" onClick={signIn}>
+          Sign in
+        </button>
+      </div>
+    );
+  }
+
+  async function onApprove(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const approved = await approveClaim(claimId);
+      setResult(`Approved claim for house ${approved.houseId} (claimant ${approved.userId}).`);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="screen">
       <h2>Organizer dashboard</h2>
       <div className="banner">
-        Claim approval, duplicate-neighborhood overlap review, and community-report moderation are
-        implemented in Milestones 3-4. This screen is a placeholder for the information
-        architecture.
+        Duplicate-neighborhood overlap review and community-report moderation ship in Milestone 4.
       </div>
-      <div className="card">
-        <strong>Pending claims</strong>
-        <p className="muted">None yet — organizer approval ships in Milestone 3.</p>
-      </div>
-      <div className="card">
-        <strong>Overlap review queue</strong>
-        <p className="muted">None yet — duplicate-neighborhood review ships in Milestone 4.</p>
-      </div>
+      <form className="card" onSubmit={onApprove} style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+        <strong>Approve a claim</strong>
+        <div className="field">
+          <label htmlFor="claimId">Claim id (houseId::claimantUserId)</label>
+          <input id="claimId" value={claimId} onChange={(e) => setClaimId(e.target.value)} required />
+        </div>
+        <button className="btn" type="submit" disabled={busy}>
+          Approve
+        </button>
+        {result && <p className="muted">{result}</p>}
+        {error && <p className="muted">⚠️ {error}</p>}
+      </form>
     </div>
   );
 }
