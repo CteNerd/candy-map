@@ -76,6 +76,7 @@ unfinished acceptance criteria" at the bottom — nothing is silently dropped.
 - [x] Generated API/Cognito/CloudFront permissions tightened after creation
 - [x] Live app deployment and HTTP smoke checks using project permissions
 - [x] GitHub production environment restricted to main; OIDC workflow and environment variables
+- [x] Real GitHub Actions clean install/build/111 tests/lint and AWS OIDC deployment verified
 - [x] Clean shared-first build order, real Lambda bundle-load regression tests, explicit map worker
 
 ## Known gaps / unfinished acceptance criteria

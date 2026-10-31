@@ -76,8 +76,9 @@ Previous hashed assets are retained so open tabs continue working during a relea
 The private S3 bucket is served through CloudFront HTTPS with SPA deep-link routing. Its origin
 is automatically used for API CORS and Cognito `/auth/callback`; no manual second deployment or
 wildcard CORS is needed. The Cognito domain prefix defaults to account+region. Local development
-still has a callback at `http://localhost:5173/auth/callback`; fill in the public variables in
-`apps/web/.env.local` from backend outputs to use the deployed API locally.
+still has a callback at `http://localhost:5173/auth/callback`, but API CORS intentionally permits
+only the deployed origin. Local development uses fixtures by default; connecting localhost to
+the live API also requires an explicit development CORS configuration.
 
 After the first successful deployment, use the setup identity **once more** to restrict generated
 API, Cognito, distribution and origin-access-control IDs (instead of their initial wildcards):
@@ -183,6 +184,8 @@ up-to-date list. Highlights:
 - All three resolved IAM policies passed AWS policy validation. Permission simulation rejected
   unrelated stacks, distributions, functions, user pools and IAM roles.
 - 111 tests pass, including loading all nine real bundled Lambda handlers in Node.
+- [GitHub Actions verification and OIDC deployment](https://github.com/CteNerd/candy-map/actions/runs/41238984449)
+  completed successfully: verification took 1m06s and deployment took 1m46s.
 
 ## Manual smoke-test checklist
 
