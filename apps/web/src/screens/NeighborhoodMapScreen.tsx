@@ -98,7 +98,7 @@ function NeighborhoodMapForEvent() {
 
   async function onShare() {
     if (!neighborhood) return;
-    const url = new URL(window.location.origin);
+    const url = new URL("/map", window.location.origin);
     url.searchParams.set("lat", String(neighborhood.centroid.lat));
     url.searchParams.set("lon", String(neighborhood.centroid.lon));
     url.searchParams.set("neighborhood", neighborhood.id);
@@ -120,6 +120,7 @@ function NeighborhoodMapForEvent() {
         {!eventError && lifecycle === "past" && <p className="banner">This holiday has ended. Live listings are hidden. Public house archives are not available yet.</p>}
         {!eventError && lifecycle === "upcoming" && <p className="banner">This holiday has not started. Residents can save their own edition-specific participation.</p>}
         <p className="muted">Dates use {edition.timezone}. {edition.type === "christmas-lights" ? "November 1 through January 6. A listed display is not confirmation that lights are on now or an invitation onto private property." : "October 31. Only active candy updates appear."}</p>
+        <Link to="/privacy">Remove or block a property</Link>
         <AddressSearch onSelect={({ point }) => setLookupPoint(point)} />
         <div className="button-row">
           <button className="btn" onClick={locate} disabled={locating}>{locating ? "Locating..." : "Use my location"}</button>

@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { EVENT_STATUS_LABELS, isPointInPolygon, type EventParticipation, type EventStatus, type HouseClaim, type MyHouseClaim, type PublicNeighborhood } from "@candy-map/shared";
 import { useAuth } from "../auth/AuthContext";
-import { fetchMyClaims, fetchNeighborhoodsNear, isLiveApiConfigured, resolveHouse, submitClaim, updateEventParticipation } from "../lib/api";
+import { fetchMyClaims, fetchNeighborhoodsNear, isLiveApiConfigured, resolveHouse, submitClaim, updateEventParticipation, requestHouseAccess } from "../lib/api";
 import { GoogleMap } from "../map/GoogleMap";
 import { AddressSearch } from "../map/AddressSearch";
 import { DEFAULT_CENTER, parsePoint, useLocation } from "../map/useLocation";
 import { useEventEdition } from "../lib/useEventEdition";
+import { HouseholdPanel } from "./HouseholdPanel";
 
 export function ResidentDashboard() {
   const { eventId } = useEventEdition();
@@ -22,6 +23,7 @@ function ResidentDashboardForEvent() {
   const [claim, setClaim] = useState<HouseClaim | null>(null);
   const [claims, setClaims] = useState<MyHouseClaim[]>([]);
   const [addingHouse, setAddingHouse] = useState(false);
+  const activeClaim = claims.find((item) => item.houseId === claim?.houseId);
   const [participation, setParticipation] = useState<EventParticipation | null>(null);
   const [publicOptIn, setPublicOptIn] = useState(false);
   const [savingStatus, setSavingStatus] = useState<EventStatus | null>(null);
@@ -136,7 +138,10 @@ function ResidentDashboardForEvent() {
         throw new Error("This address is already associated with a different neighborhood. Ask an organizer to review it.");
       }
       const newClaim = await submitClaim(resolvedHouse.id);
-      setClaims((current) => [...current.filter((item) => item.houseId !== newClaim.houseId), { ...newClaim, participation: null, eventParticipation: null }]);
+      setClaims((current) => [...current.filter((item) => item.houseId !== newClaim.houseId), {
+        ...newClaim, participation: null, eventParticipation: null,
+        houseLabel: resolvedHouse.addressDisplayPrivate, neighborhoodName: neighborhood.name,
+      }]);
       setClaim(newClaim);
       setParticipation(null);
       setPublicOptIn(false);
@@ -176,7 +181,7 @@ function ResidentDashboardForEvent() {
       <p className="event-summary">{edition.icon} {edition.label} · {lifecycle}</p>
       {eventError && <p role="alert" className="banner">{eventError}</p>}
       <p className="muted">
-        Signed in as {user.email ?? user.sub}.{" "}
+        {user.email ? `Signed in as ${user.email}.` : "Signed in."}{" "}
         <button className="btn btn--secondary" onClick={signOut} style={{ padding: "0.2rem 0.6rem" }}>
           Sign out
         </button>
@@ -198,7 +203,7 @@ function ResidentDashboardForEvent() {
           setError(null);
           setAddingHouse(false);
         }}>
-          {claims.map((item) => <option key={item.houseId} value={item.houseId}>House {item.houseId} · {item.status}</option>)}
+          {claims.map((item) => <option key={item.houseId} value={item.houseId}>{item.houseLabel ?? "My house"}{item.neighborhoodName ? ` · ${item.neighborhoodName}` : ""} · {item.accessSource === "membership" ? `Invited ${item.accessRole}` : item.status}</option>)}
         </select>
         <button className="btn btn--secondary" disabled={busy} onClick={() => setAddingHouse((value) => !value)}>{addingHouse ? "Cancel adding house" : "Add another house"}</button>
       </div>}
@@ -269,7 +274,14 @@ function ResidentDashboardForEvent() {
             Your claim was submitted as <code>self_reported</code>. You can update holiday
             participation once an organizer approves it. Approval is not proof of ownership.
           </p>
-          <Link to={`/organizer?eventId=${encodeURIComponent(eventId)}&claim=${encodeURIComponent(`${claim.houseId}::${claim.userId}`)}`}>Review this claim (organizers only)</Link>
+          <Link to={`/organizer?eventId=${encodeURIComponent(eventId)}`}>Organizer claim review</Link>
+          <button className="btn btn--secondary" disabled={busy} onClick={async () => {
+            setBusy(true); setError(null);
+            try { await requestHouseAccess(claim.houseId); setSaveMessage("Access request sent to this house's managers."); }
+            catch (error) { setError(error instanceof Error ? error.message : "Could not request access."); }
+            finally { setBusy(false); }
+          }}>Request access instead of disputing ownership</button>
+          {saveMessage && <p role="status">{saveMessage}</p>}
         </div>
       )}
 
@@ -286,14 +298,15 @@ function ResidentDashboardForEvent() {
           </p>}
           {lifecycle === "past" && <p className="banner">This holiday has ended. Your saved participation remains private here; public archives are not available yet.</p>}
           {edition.type === "christmas-lights" && <p className="muted">A display listing is not a live lights-on confirmation. Nightly viewing schedules are coming later.</p>}
-          <label className="consent-field"><input type="checkbox" checked={publicOptIn} disabled={busy || lifecycle === "past"}
+          {activeClaim?.blocked && <p className="banner">This property is hidden by a privacy hold. Publication and shared access cannot resume until reviewed. <Link to="/privacy">Privacy and removal</Link></p>}
+          <label className="consent-field"><input type="checkbox" checked={publicOptIn} disabled={busy || lifecycle === "past" || activeClaim?.blocked || activeClaim?.accessRole === "editor"}
             onChange={(event) => setPublicOptIn(event.target.checked)} /> Publish this house's precise map location for {edition.label} when the event and status are active. This does not permit public historical pins.</label>
           {lifecycle !== "past" && <p className="muted">Choose a status below to save this publication preference. Changing the checkbox alone does not update the public map.</p>}
           <div className="button-row">
             {edition.statuses.map((status) => (
               <button key={status}
                 className={`btn btn--secondary${participation?.status === status ? ` candy-status--${status}` : ""}`}
-                aria-pressed={participation?.status === status} disabled={busy || lifecycle === "past"} onClick={() => onToggleStatus(status)}>
+                aria-pressed={participation?.status === status} disabled={busy || lifecycle === "past" || activeClaim?.blocked} onClick={() => onToggleStatus(status)}>
                 {savingStatus === status ? "Saving..." : EVENT_STATUS_LABELS[status]}
               </button>
             ))}
@@ -301,6 +314,9 @@ function ResidentDashboardForEvent() {
           {saveMessage && <p role="status">{saveMessage}</p>}
         </div>
       )}
+      {claim?.status === "approved" && !claimLoading && !addingHouse && !eventError && !activeClaim?.blocked && activeClaim?.accessRole !== "editor" &&
+        <HouseholdPanel key={`${claim.houseId}:${eventId}`} houseId={claim.houseId} eventId={eventId} />}
+      <Link to="/privacy">Remove or block my house / private authority review</Link>
     </div>
   );
 }

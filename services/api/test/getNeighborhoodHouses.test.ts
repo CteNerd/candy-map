@@ -6,6 +6,7 @@ import { ddbDocClient } from "../src/lib/ddb.js";
 import { handler } from "../src/handlers/getNeighborhoodHouses.js";
 import { getCurrentSeasonId, houseParticipationKey } from "../src/lib/table.js";
 import type { CandyParticipation, House } from "@candy-map/shared";
+import { houseBlockKey } from "../src/lib/privacy.js";
 
 const ddbMock = mockClient(ddbDocClient);
 const seasonId = getCurrentSeasonId();
@@ -42,6 +43,7 @@ function makeEvent(id?: string): APIGatewayProxyEventV2 {
 
 beforeEach(() => {
   ddbMock.reset();
+  ddbMock.on(GetCommand).resolves({});
   process.env.TABLE_NAME = "test-table";
 });
 
@@ -77,5 +79,13 @@ describe("getNeighborhoodHouses handler", () => {
     ddbMock.on(QueryCommand).resolves({ Items: [] });
     const result = (await handler(makeEvent("n-empty"))) as APIGatewayProxyStructuredResultV2;
     expect(JSON.parse(result.body!)).toEqual([]);
+  });
+  it("suppresses blocked houses even on the legacy public route", async () => {
+    ddbMock.on(QueryCommand).resolves({ Items: [PUBLIC_AVAILABLE_HOUSE] });
+    ddbMock.on(GetCommand, { Key: houseBlockKey("house-1") }).resolves({ Item: { blocked: true } });
+    ddbMock.on(GetCommand, { Key: houseParticipationKey("house-1", seasonId) }).resolves({ Item: participationFor("house-1") });
+    const result = await handler(makeEvent("n1")) as APIGatewayProxyStructuredResultV2;
+    expect(JSON.parse(result.body!)).toEqual([]);
+    expect(result.headers?.["Cache-Control"]).toBe("no-store");
   });
 });

@@ -53,10 +53,55 @@ export function isLiveApiConfigured(): boolean {
 // These never silently fall back to fixtures — a failed mutation must surface as an error, not a
 // misleading fake success.
 
-async function authenticatedFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  if (!API_BASE_URL) {
-    throw new Error("VITE_API_BASE_URL not configured");
+  export interface PrivacyRequestBody {
+    street: string; unit?: string; postalCode: string; country: string;
+    mode: "block" | "remove"; message?: string;
   }
+  export interface PrivacyRequestEntry {
+    id: string; address: string; state: string; mode: "block" | "remove"; message: string; createdAt: string;
+  }
+  export async function submitPrivacyRequest(body: PrivacyRequestBody): Promise<{ id: string; state: string }> {
+    if (!API_BASE_URL) throw new Error("Privacy requests require the live API. Fixture mode cannot remove a property.");
+    const response = await fetch(`${API_BASE_URL}/privacy/requests`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      const result = await response.json() as { error?: string };
+      throw new Error(result.error ?? `Privacy request failed (${response.status}).`);
+    }
+    return response.json();
+  }
+  export const fetchPrivacyRequests = () => authenticatedFetch<PrivacyRequestEntry[]>("/privacy/requests");
+  export const resolvePrivacyRequest = (id: string, body: { decision: "approve" | "reject" | "restore"; note: string; authorityConfirmed?: boolean }) =>
+    authenticatedFetch(`/privacy/requests/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(body) });
+
+  export interface HouseholdEntry {
+    key: string; label: string; role?: "manager" | "editor"; eventId?: string; removable?: boolean;
+  }
+  export interface HouseholdDetails {
+    houseLabel: string; members: HouseholdEntry[]; requests: HouseholdEntry[]; invitations: HouseholdEntry[];
+  }
+  export const fetchHousehold = (houseId: string, eventId: string) =>
+    authenticatedFetch<HouseholdDetails>(`/houses/${encodeURIComponent(houseId)}/household?eventId=${encodeURIComponent(eventId)}`);
+  export const createHouseInvitation = (houseId: string, body: { role: "manager" | "editor"; eventId?: string; email?: string }) =>
+    authenticatedFetch<{ link: string; expiresAt: string; emailAccepted: boolean; role: string }>(`/houses/${encodeURIComponent(houseId)}/invitations`, { method: "POST", body: JSON.stringify(body) });
+  export const acceptHouseInvitation = (token: string) =>
+    authenticatedFetch<{ houseLabel: string; role: string; eventId?: string }>("/household/invitations/accept", { method: "POST", body: JSON.stringify({ token }) });
+  export const requestHouseAccess = (houseId: string) =>
+    authenticatedFetch(`/houses/${encodeURIComponent(houseId)}/access-requests`, { method: "POST" });
+  export const householdAction = (houseId: string, body: { key: string; action: string; eventId: string }) =>
+    authenticatedFetch(`/houses/${encodeURIComponent(houseId)}/household/actions`, { method: "POST", body: JSON.stringify(body) });
+  export const fetchMyNeighborhoods = () => authenticatedFetch<PublicNeighborhood[]>("/me/neighborhoods");
+  export const renameNeighborhood = (id: string, name: string) =>
+    authenticatedFetch<PublicNeighborhood>(`/neighborhoods/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ name }) });
+  export interface OrganizerClaim {
+    claimKey: string; houseLabel: string; status: string; createdAt: string;
+  }
+  export const fetchNeighborhoodClaims = (id: string) =>
+    authenticatedFetch<OrganizerClaim[]>(`/neighborhoods/${encodeURIComponent(id)}/claims`);
+
+async function authenticatedFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  if (!API_BASE_URL) throw new Error("VITE_API_BASE_URL not configured");
   const idToken = getIdToken();
   if (!idToken) {
     throw new Error("Sign in required.");

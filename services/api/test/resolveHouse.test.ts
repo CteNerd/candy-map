@@ -53,6 +53,7 @@ function makeEvent(body: unknown, authenticated = true): APIGatewayProxyEventV2 
 
 beforeEach(() => {
   ddbMock.reset();
+  ddbMock.on(GetCommand).resolves({});
   process.env.TABLE_NAME = "test-table";
 });
 

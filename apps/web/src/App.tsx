@@ -8,6 +8,9 @@ import { OrganizerDashboard } from "./screens/OrganizerDashboard";
 import { AuthCallbackScreen } from "./screens/AuthCallbackScreen";
 import { AuthProvider } from "./auth/AuthContext";
 import { CreateNeighborhoodScreen } from "./screens/CreateNeighborhoodScreen";
+import { HomeScreen } from "./screens/HomeScreen";
+import { PrivacyScreen } from "./screens/PrivacyScreen";
+import { InviteScreen } from "./screens/InviteScreen";
 
 function App() {
   const { edition, eventId, eventError } = useEventEdition();
@@ -39,7 +42,10 @@ function App() {
         </header>
         <main className="app-main">
           <Routes>
-            <Route path="/" element={<NeighborhoodMapScreen />} />
+            <Route path="/" element={params.has("lat") || params.has("neighborhood") ? <NeighborhoodMapScreen /> : <HomeScreen />} />
+            <Route path="/map" element={<NeighborhoodMapScreen />} />
+            <Route path="/privacy" element={<PrivacyScreen />} />
+            <Route path="/invite" element={<InviteScreen />} />
             <Route path="/join" element={<FindJoinNeighborhoodScreen />} />
             <Route path="/neighborhoods/new" element={<CreateNeighborhoodScreen />} />
             <Route path="/dashboard" element={<ResidentDashboard />} />
@@ -48,12 +54,14 @@ function App() {
           </Routes>
         </main>
         <nav className="app-nav">
-          <NavLink to={`/${eventQuery}`} end>
+          <NavLink to={`/${eventQuery}`} end>Home</NavLink>
+          <NavLink to={`/map${eventQuery}`}>
             Map
           </NavLink>
           <NavLink to={`/join${eventQuery}`}>Find/Join</NavLink>
           <NavLink to={`/dashboard${eventQuery}`}>My houses</NavLink>
           <NavLink to={`/organizer${eventQuery}`}>Organizer</NavLink>
+          <NavLink to="/privacy">Privacy</NavLink>
         </nav>
       </div>
     </AuthProvider>

@@ -6,7 +6,7 @@
  * change another house's status."
  */
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
-import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 import { canModifyCandyStatus } from "@candy-map/shared";
 import type { CandyParticipation, CandyStatus, House, HouseClaim } from "@candy-map/shared";
 import { ddbDocClient } from "../lib/ddb.js";
@@ -14,6 +14,7 @@ import { getAuthenticatedUserId } from "../lib/auth.js";
 import { isActiveOrganizer } from "../lib/authz.js";
 import { errorResponse, jsonResponse } from "../lib/responses.js";
 import { getCurrentSeasonId, getTableName, houseClaimKey, houseKey, houseParticipationKey } from "../lib/table.js";
+import { isHouseBlocked, publicationPrivacyConditions } from "../lib/privacy.js";
 
 const VALID_STATUSES: CandyStatus[] = ["available", "low", "finished"];
 const DEFAULT_PARTICIPATION_WINDOW_MS = 6 * 60 * 60 * 1000; // 6 hours — a typical trick-or-treat evening window
@@ -51,6 +52,7 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<APIGateway
   if (!house) {
     return errorResponse(404, "House not found.");
   }
+  if (await isHouseBlocked(tableName, house)) return errorResponse(409, "This property is unavailable for updates.");
 
   const [claimResult, organizer] = await Promise.all([
     ddbDocClient.send(new GetCommand({ TableName: tableName, Key: houseClaimKey(houseId, userId) })),
@@ -74,10 +76,10 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<APIGateway
   };
 
   await ddbDocClient.send(
-    new PutCommand({
-      TableName: tableName,
-      Item: { ...houseParticipationKey(houseId, participation.seasonId), ...participation },
-    }),
+    new TransactWriteCommand({ TransactItems: [
+      ...publicationPrivacyConditions(tableName, house),
+      { Put: { TableName: tableName, Item: { ...houseParticipationKey(houseId, participation.seasonId), ...participation } } },
+    ] }),
   );
 
   return jsonResponse(200, participation);

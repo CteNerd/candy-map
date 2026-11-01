@@ -25,7 +25,8 @@ const runtimeRoles = arn("iam", "role/candy-map/runtime/*", "");
 const boundary = new iam.ManagedPolicy(stack, "RuntimeBoundary", {
   managedPolicyName: "candy-map-runtime-boundary",
   statements: [
-    statement(["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query", "dynamodb:Scan"], [tableArn, `${tableArn}/index/*`]),
+    statement(["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:ConditionCheckItem"], [tableArn, `${tableArn}/index/*`]),
+    statement(["ses:SendEmail"], [arn("ses", "identity/*")]),
     statement(["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"], [logsArn, `${logsArn}:*`]),
   ],
 });
@@ -45,6 +46,7 @@ const executionPolicy = new iam.ManagedPolicy(stack, "ExecutionPolicy", {
   managedPolicyName: "candy-map-cloudformation",
   statements: [
     statement(["ssm:GetParameters"], [arn("ssm", "parameter/cdk-bootstrap/candymap/version")]),
+    statement(["ssm:GetParameters"], [arn("ssm", "parameter/candy-map/invitations/sender")]),
     statement([
       "dynamodb:CreateTable", "dynamodb:DescribeTable", "dynamodb:UpdateTable", "dynamodb:DeleteTable",
       "dynamodb:DescribeTimeToLive", "dynamodb:UpdateTimeToLive", "dynamodb:TagResource", "dynamodb:UntagResource",

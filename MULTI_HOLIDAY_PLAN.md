@@ -30,7 +30,8 @@ main for the existing verification/deployment workflow.
   verified account before assigning membership; the initial assignment was verified.
 - SES prerequisites were checked in the deployment region: sender verification
   and production sending access are established. SES accepted a one-time test
-  message. Inbox delivery and app-integrated invitation email are not yet verified.
+  message. Invitation email is now integrated; actual inbox delivery and a
+  signed-in production acceptance flow still need user confirmation.
   Sender identity and reviewer account details are deliberately not recorded here.
 - Reviewer provisioning required app-user-pool-scoped CloudFormation group
   management permissions. Ordinary deployers cannot assign group members through
@@ -42,15 +43,31 @@ main for the existing verification/deployment workflow.
 - Edition boundaries currently use America/Chicago as an explicit launch-region
   policy. Per-neighborhood timezone selection remains future work.
 - Legacy routes remain available for old clients; this stage does not rewrite
-  production records or claim to implement archive consent or household privacy.
+  production records or implement archive consent. Privacy suppression applies
+  to both legacy and explicit-event listings.
 - Holiday UI release: year-round display name, explicit edition selector, event
   links, Christmas/Halloween themes and markers, neutral favicon, new generated
   social artwork, explicit publication controls, and a private multi-house selector.
 - Plan, event API, and holiday UI increments passed GitHub verification and
   deployment. The UI increment passed build, 166 tests, lint (one existing
   fast-refresh warning), and a 390x844 browser check, including event switching
-  without horizontal overflow. Full resident collaboration,
-  privacy workflows, historical publication, and joint displays remain pending.
+  without horizontal overflow.
+- Current privacy/household/home release implements anonymous removal and
+  preemptive blocking intake, reviewer-only decisions and authority-confirmed
+  restoration, durable suppression, and 90-day resolved-detail expiry.
+  Address normalization is not verified property matching; building-wide requests
+  and aliases still need manual authority/address review.
+- Household release implements manager/editor invitations (share links or SES
+  email), explicit acceptance, holiday-scoped memberships, access requests,
+  manager approval, collaborator removal, and invitation revocation. House access
+  never propagates to other properties or enrolls another holiday. Automated
+  ownership recovery and self-leaving remain future work.
+- Home page explains participation and privacy. Resident/organizer worklists use
+  readable house/neighborhood labels; authorized organizers can rename a
+  neighborhood without changing its boundary, houses, or membership.
+- These current changes are awaiting release verification and deployment.
+  Community sightings, historical publication, additional holiday types, and
+  joint displays remain pending.
 
 ## Goals and agreed defaults
 

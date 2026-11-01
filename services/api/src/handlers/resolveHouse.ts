@@ -21,6 +21,7 @@ import { getAuthenticatedUserId } from "../lib/auth.js";
 import { generateId } from "../lib/ids.js";
 import { errorResponse, jsonResponse } from "../lib/responses.js";
 import { getTableName, houseGsi1, houseKey, houseKeyReservationKey, neighborhoodKey } from "../lib/table.js";
+import { addressBlockKey, isHouseBlocked } from "../lib/privacy.js";
 
 interface ResolveHouseRequestBody {
   neighborhoodId: string;
@@ -53,7 +54,7 @@ function parseBody(event: APIGatewayProxyEventV2): ResolveHouseRequestBody | nul
 }
 
 async function fetchHouseById(tableName: string, houseId: string): Promise<House | undefined> {
-  const result = await ddbDocClient.send(new GetCommand({ TableName: tableName, Key: houseKey(houseId) }));
+  const result = await ddbDocClient.send(new GetCommand({ TableName: tableName, Key: houseKey(houseId), ConsistentRead: true }));
   return result.Item as House | undefined;
 }
 
@@ -82,7 +83,9 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<APIGateway
     return errorResponse(422, "This address falls outside the neighborhood's boundary.");
   }
 
-  const addressKey = canonicalAddressKey(body);
+  const addressKey = canonicalAddressKey({ ...body, providerAddressId: undefined });
+  const privacy = await ddbDocClient.send(new GetCommand({ TableName: tableName, Key: addressBlockKey(canonicalAddressKey({ ...body, providerAddressId: undefined })), ConsistentRead: true }));
+  if (privacy.Item?.blocked) return errorResponse(409, "This property is unavailable for registration.");
   const reservationKey = houseKeyReservationKey(addressKey);
 
   const existingReservation = await ddbDocClient.send(
@@ -90,6 +93,8 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<APIGateway
   );
   if (existingReservation.Item) {
     const existingHouse = await fetchHouseById(tableName, existingReservation.Item.houseId as string);
+    if (!existingHouse) return errorResponse(503, "Property records are temporarily inconsistent. Please try again later.");
+    if (existingHouse && await isHouseBlocked(tableName, existingHouse)) return errorResponse(409, "This property is unavailable for registration.");
     return jsonResponse(200, { house: existingHouse, created: false });
   }
 
@@ -108,6 +113,8 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<APIGateway
     await ddbDocClient.send(
       new TransactWriteCommand({
         TransactItems: [
+          { ConditionCheck: { TableName: tableName, Key: addressBlockKey(addressKey),
+            ConditionExpression: "attribute_not_exists(pk) OR blocked = :no", ExpressionAttributeValues: { ":no": false } } },
           {
             Put: {
               TableName: tableName,
@@ -133,6 +140,8 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<APIGateway
       const reservation = await ddbDocClient.send(new GetCommand({ TableName: tableName, Key: reservationKey }));
       if (reservation.Item) {
         const winningHouse = await fetchHouseById(tableName, reservation.Item.houseId as string);
+        if (!winningHouse) return errorResponse(503, "Property records are temporarily inconsistent. Please try again later.");
+        if (winningHouse && await isHouseBlocked(tableName, winningHouse)) return errorResponse(409, "This property is unavailable for registration.");
         return jsonResponse(200, { house: winningHouse, created: false });
       }
     }

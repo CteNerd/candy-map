@@ -32,7 +32,7 @@ describe("CandyMapStack", { timeout: 20_000 }, () => {
       .filter((entry) => entry.startsWith("asset."))
       .map((entry) => join(app.outdir, entry, "index.js"))
       .filter((entry) => existsSync(entry));
-    expect(bundles).toHaveLength(10);
+    expect(bundles).toHaveLength(13);
     const result = spawnSync(process.execPath, ["-e",
       "for (const file of process.argv.slice(1)) { if (typeof require(file).handler !== 'function') throw new Error('Missing handler: ' + file); }",
       ...bundles], { encoding: "utf8", timeout: 10_000 });
@@ -82,9 +82,9 @@ describe("CandyMapStack", { timeout: 20_000 }, () => {
     template.resourceCountIs("AWS::Cognito::UserPoolUserToGroupAttachment", 0);
   });
 
-  it("creates one Lambda function per public + authenticated handler (10 total)", () => {
+  it("creates one Lambda function per public + authenticated handler (13 total)", () => {
     const template = synthesize();
-    template.resourceCountIs("AWS::Lambda::Function", 10);
+    template.resourceCountIs("AWS::Lambda::Function", 13);
   });
 
   it("creates an HTTP API with the public and authenticated routes", () => {
@@ -101,6 +101,17 @@ describe("CandyMapStack", { timeout: 20_000 }, () => {
       "GET /me/claims",
       "POST /admin/claims/{id}/approve",
       "POST /houses/{id}/reports",
+      "POST /privacy/requests",
+      "GET /privacy/requests",
+      "PATCH /privacy/requests/{id}",
+      "GET /houses/{id}/household",
+      "POST /houses/{id}/household/actions",
+      "POST /houses/{id}/invitations",
+      "POST /houses/{id}/access-requests",
+      "POST /household/invitations/accept",
+      "GET /me/neighborhoods",
+      "GET /neighborhoods/{id}/claims",
+      "PATCH /neighborhoods/{id}",
     ];
     for (const routeKey of expectedRouteKeys) {
       template.hasResourceProperties("AWS::ApiGatewayV2::Route", { RouteKey: routeKey });
@@ -118,7 +129,7 @@ describe("CandyMapStack", { timeout: 20_000 }, () => {
   it("attaches a JWT authorizer to every authenticated route and no public route", () => {
     const template = synthesize();
     const routes = template.findResources("AWS::ApiGatewayV2::Route");
-    const publicRouteKeys = new Set(["GET /neighborhoods", "GET /neighborhoods/{id}/houses"]);
+    const publicRouteKeys = new Set(["GET /neighborhoods", "GET /neighborhoods/{id}/houses", "POST /privacy/requests"]);
 
     for (const route of Object.values(routes) as Array<{ Properties: { RouteKey: string; AuthorizationType?: string } }>) {
       const isPublic = publicRouteKeys.has(route.Properties.RouteKey);
@@ -145,6 +156,8 @@ describe("CandyMapStack", { timeout: 20_000 }, () => {
     expect(allActions).toContain("dynamodb:GetItem");
     // ...alongside the write actions Milestone 3 legitimately needs.
     expect(allActions).toContain("dynamodb:PutItem");
+    expect(allActions).toContain("dynamodb:ConditionCheckItem");
+    expect(allActions).toContain("ses:SendEmail");
     // DynamoDB authorizes transaction components via PutItem, not a TransactWriteItems IAM action.
     expect(allActions).not.toContain("dynamodb:TransactWriteItems");
     // Nothing in this stack ever deletes data.

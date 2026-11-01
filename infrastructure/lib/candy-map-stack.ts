@@ -9,6 +9,7 @@ import * as integrations from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as authorizers from "aws-cdk-lib/aws-apigatewayv2-authorizers";
 import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as iam from "aws-cdk-lib/aws-iam";
+import * as ssm from "aws-cdk-lib/aws-ssm";
 
 const API_HANDLERS_DIR = path.join(__dirname, "..", "..", "services", "api", "src", "handlers");
 
@@ -144,6 +145,15 @@ export class CandyMapStack extends cdk.Stack {
 
     // Authenticated write path (Milestone 4)
     const reportHouseFn = makeFn("ReportHouseFn", "reportHouse.ts");
+    const privacyRequestsFn = makeFn("PrivacyRequestsFn", "privacyRequests.ts");
+    const householdFn = makeFn("HouseholdFn", "household.ts");
+    const organizerNeighborhoodsFn = makeFn("OrganizerNeighborhoodsFn", "organizerNeighborhoods.ts");
+    const invitationSender = ssm.StringParameter.valueForStringParameter(this, "/candy-map/invitations/sender");
+    householdFn.addEnvironment("INVITATION_SENDER", invitationSender);
+    householdFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ["ses:SendEmail"],
+      resources: [`arn:${this.partition}:ses:${this.region}:${this.account}:identity/${invitationSender}`],
+    }));
 
     // Least-privilege: each function only gets the DynamoDB actions it actually performs.
     table.grant(getNeighborhoodsFn, "dynamodb:Scan");
@@ -157,6 +167,10 @@ export class CandyMapStack extends cdk.Stack {
     table.grant(getMyClaimsFn, "dynamodb:Query", "dynamodb:GetItem");
     table.grant(approveClaimFn, "dynamodb:GetItem", "dynamodb:PutItem");
     table.grant(reportHouseFn, "dynamodb:GetItem", "dynamodb:PutItem");
+    table.grant(privacyRequestsFn, "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query", "dynamodb:ConditionCheckItem");
+    table.grant(householdFn, "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query", "dynamodb:ConditionCheckItem");
+    table.grant(organizerNeighborhoodsFn, "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:ConditionCheckItem");
+    for (const fn of [resolveHouseFn, toggleCandyStatusFn, updateEventParticipationFn]) table.grant(fn, "dynamodb:ConditionCheckItem");
 
     // --- HTTP API -------------------------------------------------------
     const httpApi = new apigw.HttpApi(this, "CandyMapHttpApi", {
@@ -223,6 +237,25 @@ export class CandyMapStack extends cdk.Stack {
       integration: new integrations.HttpLambdaIntegration("UpdateEventParticipationIntegration", updateEventParticipationFn),
       authorizer,
     });
+    httpApi.addRoutes({
+      path: "/privacy/requests", methods: [apigw.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration("SubmitPrivacyRequestIntegration", privacyRequestsFn),
+    });
+    for (const [route, methods, fn] of [
+      ["/privacy/requests", [apigw.HttpMethod.GET], privacyRequestsFn],
+      ["/privacy/requests/{id}", [apigw.HttpMethod.PATCH], privacyRequestsFn],
+      ["/houses/{id}/household", [apigw.HttpMethod.GET], householdFn],
+      ["/houses/{id}/household/actions", [apigw.HttpMethod.POST], householdFn],
+      ["/houses/{id}/invitations", [apigw.HttpMethod.POST], householdFn],
+      ["/houses/{id}/access-requests", [apigw.HttpMethod.POST], householdFn],
+      ["/household/invitations/accept", [apigw.HttpMethod.POST], householdFn],
+      ["/me/neighborhoods", [apigw.HttpMethod.GET], organizerNeighborhoodsFn],
+      ["/neighborhoods/{id}/claims", [apigw.HttpMethod.GET], organizerNeighborhoodsFn],
+      ["/neighborhoods/{id}", [apigw.HttpMethod.PATCH], organizerNeighborhoodsFn],
+    ] as const) {
+      httpApi.addRoutes({ path: route, methods: [...methods], authorizer,
+        integration: new integrations.HttpLambdaIntegration(`${route.replace(/[^a-zA-Z]/g, "")}Integration`, fn) });
+    }
     httpApi.addRoutes({
       path: "/me/claims",
       methods: [apigw.HttpMethod.GET],

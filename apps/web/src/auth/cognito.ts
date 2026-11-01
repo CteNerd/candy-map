@@ -34,7 +34,7 @@ export async function redirectToSignIn(): Promise<void> {
   const state = generateState();
   sessionStorage.setItem(SESSION_KEYS.codeVerifier, codeVerifier);
   sessionStorage.setItem(SESSION_KEYS.state, state);
-  sessionStorage.setItem(SESSION_KEYS.returnTo, window.location.pathname + window.location.search);
+  sessionStorage.setItem(SESSION_KEYS.returnTo, window.location.pathname + window.location.search + window.location.hash);
 
   const codeChallenge = await generateCodeChallenge(codeVerifier);
   const params = new URLSearchParams({

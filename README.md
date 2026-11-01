@@ -5,9 +5,10 @@ tracked in [MULTI_HOLIDAY_PLAN.md](./MULTI_HOLIDAY_PLAN.md). Built per
 [`COPILOT_PLAN.md`](./COPILOT_PLAN.md); see [`TASKS.md`](./TASKS.md) for the full milestone
 checklist and known gaps.
 
-Public visitors see which opted-in houses nearby are handing out candy right now, without
-signing in. Residents sign in to claim their own house and toggle its status. Organizers approve
-claims. Nothing here claims to verify identity or home ownership — a claim is always
+The home page explains the app; public visitors can browse opted-in Halloween candy
+and Christmas light displays without signing in. Residents sign in to claim or
+join a specific house and manage its selected holiday. Organizers approve claims
+and can edit their neighborhood's name. Nothing here verifies identity or home ownership — a claim is always
 `self_reported` until an organizer approves it.
 
 ### Event editions (incremental rollout)
@@ -18,7 +19,9 @@ The API supports explicit Halloween and Christmas lights editions:
 `PATCH /houses/{id}/events/{eventId}` with `{ status, publicOptIn }`.
 Christmas uses `displaying` / `paused`; Halloween keeps `available` / `low` /
 `finished`. Publication permission is required explicitly on every new update.
-Only an approved claim for that specific house authorizes the new write endpoint;
+An approved claim or active house-specific membership authorizes the new write endpoint;
+managers can change publication consent, while editors can update status only
+after a manager has opted the house into that edition.
 neighborhood organizer status alone does not grant resident publication permission.
 Approval remains self-reported/organizer-reviewed, not verified residency.
 
@@ -31,8 +34,8 @@ and explicitly save public or private participation for the selected edition.
 The year-round display name is currently Neighborhood Celebrations; deployment
 resource names remain unchanged.
 
-Archive consent, public house archives, nightly schedules, privacy removal/blocking, house invitations,
-community publication, and joint displays are not implemented yet.
+Archive consent, public house archives, nightly schedules, community publication,
+and joint displays are not implemented yet.
 
 New participation records are keyed by edition. Year-keyed legacy records are read
 only for the matching Halloween edition, never for Christmas. Explicit-event
@@ -46,9 +49,9 @@ The infrastructure defines a `privacy-reviewers` Cognito group. Membership must 
 assigned manually to a confirmed app account using approved one-time setup
 permissions, not inferred from house claims or neighborhood organizer roles.
 Group members must sign out and back in to refresh their token after assignment.
-The group alone does not enable privacy-review endpoints: those workflows remain
-pending. SES sender verification and regional production access are prerequisites
-for invitation email; a verified sender alone does not enable an email feature.
+Only this group can access privacy-review endpoints; neighborhood organizer
+membership does not grant access. SES sender verification and regional production
+access are prerequisites for invitation email.
 Keep sender addresses and account assignments out of source control.
 
 For approved one-time reviewer setup, supply `AWS_PROFILE`, `AWS_ACCOUNT_ID`,
@@ -57,6 +60,49 @@ variables. Run `node scripts/setup-privacy-reviewer.mjs` to validate the matchin
 verified account and deployed group, then add `--assign` to explicitly grant and
 verify membership. The command never creates users/groups or grants AWS roles,
 and it checks that the user pool belongs to `CandyMapStack`.
+
+### Privacy and household release
+
+- `/privacy` accepts removal or preemptive blocking requests without sign-in.
+  Accepted intake hides matching houses on subsequent legacy and event-map reads;
+  open maps refresh within 30 seconds. Durable blocking and restoration require
+  private manual review. Rejected requests retain the hold pending reviewed restoration.
+- Matching uses normalized street/unit/postal/country address keys, not verified
+  property records. Address aliases and building-wide authority still need review.
+  Reviewers must explicitly confirm authority and record a note before restoring.
+  Resolved details expire after 90 days, with asynchronous DynamoDB TTL deletion;
+  minimal suppression records persist until explicitly lifted.
+- My houses provides 48-hour, single-use share links and optional email invitations.
+  Tokens are hashed at rest and carried in URL fragments. Email recipients must
+  sign in with the matching verified email and explicitly accept. SES acceptance
+  is not confirmation of inbox delivery. Uncertain email outcomes are reported,
+  and cleanup never overwrites concurrent acceptance.
+- Memberships grant manager/editor rights to one house, optionally one edition.
+  They never create another house, claim residency, enroll a holiday, or connect
+  other properties. Request access lets an existing manager approve an editor;
+  managers can revoke pending invitations and remove invited collaborators.
+  Automated ownership recovery, self-leaving, and claim removal are not included.
+- Resident and organizer screens show private address/neighborhood labels, not raw
+  identifiers. Organizer neighborhood editing changes only the name, preserving
+  boundaries, houses, and permissions.
+
+New API routes (JWT required except public intake; handlers enforce roles):
+
+| Routes | Purpose |
+| --- | --- |
+| `POST /privacy/requests` | Public privacy intake |
+| `GET /privacy/requests`, `PATCH /privacy/requests/{id}` | Dedicated reviewer queue and decisions |
+| `POST /houses/{id}/invitations`, `POST /household/invitations/accept` | Create and accept invitations |
+| `GET /houses/{id}/household`, `POST /houses/{id}/household/actions` | Manager worklist and member/request/invitation actions |
+| `POST /houses/{id}/access-requests` | Request access without granting it |
+| `GET /me/neighborhoods`, `GET /neighborhoods/{id}/claims`, `PATCH /neighborhoods/{id}` | Named organizer worklists and neighborhood editing |
+
+Before deploying this release, store the verified sender privately as an SSM
+String parameter at `/candy-map/invitations/sender` in the deployment region.
+The household Lambda resolves it at deployment; its SES permission is scoped to
+that sender identity. Apply the project's updated bounded setup policies before
+routine deployment to permit this parameter read, transactional condition checks,
+and scoped email sending. Do not commit sender values or invitation links.
 
 ## Architecture
 

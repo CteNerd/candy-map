@@ -75,7 +75,7 @@ describe("ResidentDashboard", () => {
     }]);
     vi.mocked(updateEventParticipation).mockResolvedValue(savedParticipation);
     renderDashboard();
-    fireEvent.click(await screen.findByRole("checkbox"));
+    fireEvent.click(await screen.findByRole("checkbox", { name: /Publish this house/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Available" }));
     await waitFor(() => expect(updateEventParticipation).toHaveBeenCalledWith("restored-house", "halloween-2026", { status: "available", publicOptIn: true }));
     expect(await screen.findByText("Saved: Available.")).toBeInTheDocument();

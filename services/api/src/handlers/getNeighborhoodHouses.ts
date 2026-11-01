@@ -13,6 +13,7 @@ import { errorResponse, jsonResponse } from "../lib/responses.js";
 import { getCurrentSeasonId, getTableName, houseParticipationKey } from "../lib/table.js";
 import { readEventParticipation } from "../lib/eventParticipation.js";
 import { createHash } from "node:crypto";
+import { isHouseBlocked } from "../lib/privacy.js";
 
 export async function handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> {
   const neighborhoodId = event.pathParameters?.id;
@@ -36,7 +37,9 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<APIGateway
     }),
   );
   const houses = (housesResult.Items ?? []) as House[];
-  const publicHouses = houses.filter((house) => house.visibility === "public");
+  const eligibleHouses = houses.filter((house) => house.visibility === "public");
+  const blocked = await Promise.all(eligibleHouses.map((house) => isHouseBlocked(tableName, house)));
+  const publicHouses = eligibleHouses.filter((_, index) => !blocked[index]);
 
   if (edition) {
     const participations = await Promise.all(publicHouses.map((house) => readEventParticipation(tableName, house.id, edition)));

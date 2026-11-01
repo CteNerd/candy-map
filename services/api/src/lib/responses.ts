@@ -12,7 +12,7 @@ function corsHeaders(): Record<string, string> {
 export function jsonResponse(statusCode: number, body: unknown): APIGatewayProxyResultV2 {
   return {
     statusCode,
-    headers: { "Content-Type": "application/json", ...corsHeaders() },
+    headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders() },
     body: JSON.stringify(body),
   };
 }

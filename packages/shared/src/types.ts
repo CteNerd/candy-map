@@ -88,6 +88,11 @@ export interface CandyParticipation {
 export interface MyHouseClaim extends HouseClaim {
   participation: CandyParticipation | null;
   eventParticipation?: import("./events.js").EventParticipation | null;
+  houseLabel?: string;
+  neighborhoodName?: string;
+  accessRole?: "manager" | "editor";
+  accessSource?: "claim" | "membership";
+  blocked?: boolean;
 }
 
 export type ModerationState = "pending" | "accepted" | "rejected";

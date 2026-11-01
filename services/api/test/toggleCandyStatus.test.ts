@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { mockClient } from "aws-sdk-client-mock";
-import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from "aws-lambda";
 import { ddbDocClient } from "../src/lib/ddb.js";
 import { handler } from "../src/handlers/toggleCandyStatus.js";
@@ -20,9 +20,10 @@ function makeEvent(body: unknown, userId = "resident-1"): APIGatewayProxyEventV2
 
 beforeEach(() => {
   ddbMock.reset();
+  ddbMock.on(GetCommand).resolves({});
   process.env.TABLE_NAME = "test-table";
   ddbMock.on(GetCommand, { Key: houseKey("house-1") }).resolves({ Item: HOUSE });
-  ddbMock.on(PutCommand).resolves({});
+  ddbMock.on(TransactWriteCommand).resolves({});
 });
 
 describe("toggleCandyStatus handler", () => {
