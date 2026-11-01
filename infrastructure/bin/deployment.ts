@@ -86,6 +86,7 @@ const executionPolicy = new iam.ManagedPolicy(stack, "ExecutionPolicy", {
       "cognito-idp:CreateUserPoolClient", "cognito-idp:UpdateUserPoolClient", "cognito-idp:DescribeUserPoolClient",
       "cognito-idp:DeleteUserPoolClient", "cognito-idp:CreateUserPoolDomain", "cognito-idp:UpdateUserPoolDomain",
       "cognito-idp:DeleteUserPoolDomain", "cognito-idp:TagResource", "cognito-idp:UntagResource", "cognito-idp:ListTagsForResource",
+      "cognito-idp:CreateGroup", "cognito-idp:GetGroup", "cognito-idp:UpdateGroup", "cognito-idp:DeleteGroup",
     ], [arn("cognito-idp", `userpool/${poolId.valueAsString}`)]),
     statement(["cognito-idp:DescribeUserPoolDomain"], ["*"]),
     statement(["cloudfront:CreateDistribution", "cloudfront:CreateOriginAccessControl"], ["*"]),
