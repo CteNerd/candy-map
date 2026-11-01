@@ -25,6 +25,17 @@ main for the existing verification/deployment workflow.
 
 ## Release progress
 
+- Reviewer setup: infrastructure defines the dedicated `privacy-reviewers` group.
+  A bounded setup command validates the deployed pool and one exact confirmed,
+  verified account before assigning membership; the initial assignment was verified.
+- SES prerequisites were checked in the deployment region: sender verification
+  and production sending access are established. SES accepted a one-time test
+  message. Inbox delivery and app-integrated invitation email are not yet verified.
+  Sender identity and reviewer account details are deliberately not recorded here.
+- Reviewer provisioning required app-user-pool-scoped CloudFormation group
+  management permissions. Ordinary deployers cannot assign group members through
+  the new policy. Infrastructure tests reuse one synthesized assertion template
+  to avoid CI timeouts.
 - Event API foundation: explicit Halloween/Christmas editions, distinct status
   validation, explicit publication boolean, matching-year Halloween-only legacy
   reads, private selected-edition restoration, and date/isolation tests.
