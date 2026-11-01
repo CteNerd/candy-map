@@ -87,6 +87,7 @@ export interface CandyParticipation {
 /** Private /me/claims projection, including this season's saved candy status. */
 export interface MyHouseClaim extends HouseClaim {
   participation: CandyParticipation | null;
+  eventParticipation?: import("./events.js").EventParticipation | null;
 }
 
 export type ModerationState = "pending" | "accepted" | "rejected";

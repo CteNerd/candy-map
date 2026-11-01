@@ -28,7 +28,7 @@ describe("CandyMapStack", () => {
       .filter((entry) => entry.startsWith("asset."))
       .map((entry) => join(app.outdir, entry, "index.js"))
       .filter((entry) => existsSync(entry));
-    expect(bundles).toHaveLength(9);
+    expect(bundles).toHaveLength(10);
     const result = spawnSync(process.execPath, ["-e",
       "for (const file of process.argv.slice(1)) { if (typeof require(file).handler !== 'function') throw new Error('Missing handler: ' + file); }",
       ...bundles], { encoding: "utf8", timeout: 10_000 });
@@ -69,9 +69,9 @@ describe("CandyMapStack", () => {
     template.hasResourceProperties("AWS::Cognito::UserPool", { DeletionProtection: "ACTIVE" });
   });
 
-  it("creates one Lambda function per public + authenticated handler (9 total)", () => {
+  it("creates one Lambda function per public + authenticated handler (10 total)", () => {
     const template = synthesize();
-    template.resourceCountIs("AWS::Lambda::Function", 9);
+    template.resourceCountIs("AWS::Lambda::Function", 10);
   });
 
   it("creates an HTTP API with the public and authenticated routes", () => {
@@ -84,6 +84,7 @@ describe("CandyMapStack", () => {
       "POST /houses/resolve",
       "POST /houses/claims",
       "PATCH /houses/{id}/candy",
+      "PATCH /houses/{id}/events/{eventId}",
       "GET /me/claims",
       "POST /admin/claims/{id}/approve",
       "POST /houses/{id}/reports",

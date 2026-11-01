@@ -15,6 +15,16 @@ main for the existing verification/deployment workflow.
 - Release progress and remaining limitations are recorded here; pushing a commit
   is not proof of a successful deployment.
 
+## Release progress
+
+- Event API foundation: explicit Halloween/Christmas editions, distinct status
+  validation, explicit publication boolean, matching-year Halloween-only legacy
+  reads, private selected-edition restoration, and date/isolation tests.
+- Edition boundaries currently use America/Chicago as an explicit launch-region
+  policy. Per-neighborhood timezone selection remains future work.
+- Legacy routes remain available for old clients; this stage does not rewrite
+  production records or claim to implement archive consent or household privacy.
+
 ## Goals and agreed defaults
 
 Expand Candy Map into a year-round neighborhood celebration map, starting with

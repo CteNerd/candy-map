@@ -1,6 +1,7 @@
 # Candy Map
 
-A mobile-first Halloween neighborhood candy map — proof of concept. Built per
+A mobile-first neighborhood holiday map — proof of concept. Multi-holiday work is
+tracked in [MULTI_HOLIDAY_PLAN.md](./MULTI_HOLIDAY_PLAN.md). Built per
 [`COPILOT_PLAN.md`](./COPILOT_PLAN.md); see [`TASKS.md`](./TASKS.md) for the full milestone
 checklist and known gaps.
 
@@ -8,6 +9,32 @@ Public visitors see which opted-in houses nearby are handing out candy right now
 signing in. Residents sign in to claim their own house and toggle its status. Organizers approve
 claims. Nothing here claims to verify identity or home ownership — a claim is always
 `self_reported` until an organizer approves it.
+
+### Event editions (incremental rollout)
+
+The API supports explicit Halloween and Christmas lights editions:
+`GET /neighborhoods/{id}/houses?eventId=christmas-lights-2026`,
+`GET /me/claims?eventId=christmas-lights-2026`, and authenticated
+`PATCH /houses/{id}/events/{eventId}` with `{ status, publicOptIn }`.
+Christmas uses `displaying` / `paused`; Halloween keeps `available` / `low` /
+`finished`. Publication permission is required explicitly on every new update.
+Only an approved claim for that specific house authorizes the new write endpoint;
+neighborhood organizer status alone does not grant resident publication permission.
+Approval remains self-reported/organizer-reviewed, not verified residency.
+
+Edition dates currently use the explicit launch-region timezone `America/Chicago`.
+Christmas 2026 runs November 1 through January 6 inclusive, including the January
+2027 portion. Live listings disappear when their edition ends. Archive consent,
+public house archives, nightly schedules, privacy removal/blocking, house invitations,
+community publication, and joint displays are not implemented yet.
+
+New participation records are keyed by edition. Year-keyed legacy records are read
+only for the matching Halloween edition, never for Christmas. Explicit-event
+private claim responses use `eventParticipation` and leave the legacy
+`participation` field null. Legacy endpoints remain Halloween-only during this
+compatibility stage; existing records are not rewritten or enrolled in new holidays.
+Exact map coordinates identify properties even though names and address labels
+are omitted; the public map is not anonymous.
 
 ## Architecture
 

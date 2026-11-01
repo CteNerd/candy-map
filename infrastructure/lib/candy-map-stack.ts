@@ -132,6 +132,7 @@ export class CandyMapStack extends cdk.Stack {
     const resolveHouseFn = makeFn("ResolveHouseFn", "resolveHouse.ts");
     const submitClaimFn = makeFn("SubmitClaimFn", "submitClaim.ts");
     const toggleCandyStatusFn = makeFn("ToggleCandyStatusFn", "toggleCandyStatus.ts");
+    const updateEventParticipationFn = makeFn("UpdateEventParticipationFn", "updateEventParticipation.ts");
     const getMyClaimsFn = makeFn("GetMyClaimsFn", "getMyClaims.ts");
     const approveClaimFn = makeFn("ApproveClaimFn", "approveClaim.ts");
 
@@ -146,6 +147,7 @@ export class CandyMapStack extends cdk.Stack {
     table.grant(resolveHouseFn, "dynamodb:GetItem", "dynamodb:PutItem");
     table.grant(submitClaimFn, "dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem");
     table.grant(toggleCandyStatusFn, "dynamodb:GetItem", "dynamodb:PutItem");
+    table.grant(updateEventParticipationFn, "dynamodb:GetItem", "dynamodb:PutItem");
     table.grant(getMyClaimsFn, "dynamodb:Query", "dynamodb:GetItem");
     table.grant(approveClaimFn, "dynamodb:GetItem", "dynamodb:PutItem");
     table.grant(reportHouseFn, "dynamodb:GetItem", "dynamodb:PutItem");
@@ -207,6 +209,12 @@ export class CandyMapStack extends cdk.Stack {
       path: "/houses/{id}/candy",
       methods: [apigw.HttpMethod.PATCH],
       integration: new integrations.HttpLambdaIntegration("ToggleCandyStatusIntegration", toggleCandyStatusFn),
+      authorizer,
+    });
+    httpApi.addRoutes({
+      path: "/houses/{id}/events/{eventId}",
+      methods: [apigw.HttpMethod.PATCH],
+      integration: new integrations.HttpLambdaIntegration("UpdateEventParticipationIntegration", updateEventParticipationFn),
       authorizer,
     });
     httpApi.addRoutes({

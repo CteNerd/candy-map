@@ -53,6 +53,10 @@ export function houseParticipationKey(houseId: string, seasonId: string): TableK
   return { pk: `HOUSE#${houseId}`, sk: `PARTICIPATION#${seasonId}` };
 }
 
+export function houseEventParticipationKey(houseId: string, eventId: string): TableKey {
+  return { pk: `HOUSE#${houseId}`, sk: `EVENT_PARTICIPATION#${eventId}` };
+}
+
 export function houseReportKey(houseId: string, reportId: string): TableKey {
   return { pk: `HOUSE#${houseId}`, sk: `REPORT#${reportId}` };
 }

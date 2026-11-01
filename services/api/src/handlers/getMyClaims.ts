@@ -11,12 +11,17 @@ import { ddbDocClient } from "../lib/ddb.js";
 import { getAuthenticatedUserId } from "../lib/auth.js";
 import { errorResponse, jsonResponse } from "../lib/responses.js";
 import { getCurrentSeasonId, getTableName, houseParticipationKey } from "../lib/table.js";
+import { getEventEdition } from "@candy-map/shared";
+import { readEventParticipation } from "../lib/eventParticipation.js";
 
 export async function handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> {
   const userId = getAuthenticatedUserId(event);
   if (!userId) {
     return errorResponse(401, "Sign-in required.");
   }
+  const eventId = event.queryStringParameters?.eventId;
+  const edition = eventId !== undefined ? getEventEdition(eventId) : undefined;
+  if (eventId !== undefined && !edition) return errorResponse(400, "Unsupported event edition.");
 
   const tableName = getTableName();
   const result = await ddbDocClient.send(
@@ -29,6 +34,13 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<APIGateway
   );
 
   const claims = (result.Items ?? []) as HouseClaim[];
+  if (edition) {
+    const response: MyHouseClaim[] = await Promise.all(claims.map(async (claim) => ({
+      ...claim, participation: null,
+      eventParticipation: await readEventParticipation(tableName, claim.houseId, edition) ?? null,
+    })));
+    return jsonResponse(200, response);
+  }
   const seasonId = getCurrentSeasonId();
   const response: MyHouseClaim[] = await Promise.all(claims.map(async (claim) => {
     const result = await ddbDocClient.send(new GetCommand({
