@@ -24,6 +24,13 @@ main for the existing verification/deployment workflow.
   policy. Per-neighborhood timezone selection remains future work.
 - Legacy routes remain available for old clients; this stage does not rewrite
   production records or claim to implement archive consent or household privacy.
+- Holiday UI release: year-round display name, explicit edition selector, event
+  links, Christmas/Halloween themes and markers, neutral favicon, new generated
+  social artwork, explicit publication controls, and a private multi-house selector.
+- Plan and event API increments passed GitHub verification and deployment.
+  The UI increment passed build/tests/lint and a 390x844 browser check, including
+  event switching without horizontal overflow. Full resident collaboration,
+  privacy workflows, historical publication, and joint displays remain pending.
 
 ## Goals and agreed defaults
 

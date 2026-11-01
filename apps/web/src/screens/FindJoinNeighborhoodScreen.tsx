@@ -5,6 +5,7 @@ import { fetchNeighborhoodsNear } from "../lib/api";
 import { Link } from "react-router-dom";
 import { AddressSearch } from "../map/AddressSearch";
 import { parsePoint, useLocation } from "../map/useLocation";
+import { useEventEdition } from "../lib/useEventEdition";
 
 interface ResultRow {
   neighborhood: PublicNeighborhood;
@@ -12,6 +13,7 @@ interface ResultRow {
 }
 
 export function FindJoinNeighborhoodScreen() {
+  const { eventId } = useEventEdition();
   const [lat, setLat] = useState("37.7765");
   const [lon, setLon] = useState("-122.428");
   const [results, setResults] = useState<ResultRow[] | null>(null);
@@ -60,7 +62,7 @@ export function FindJoinNeighborhoodScreen() {
       <AddressSearch onSelect={({ point }) => {
         setLat(String(point.lat)); setLon(String(point.lon)); void search(point.lat, point.lon);
       }} />
-      <Link to="/neighborhoods/new">Add a neighborhood</Link>
+      <Link to={`/neighborhoods/new?eventId=${encodeURIComponent(eventId)}`}>Add a neighborhood</Link>
       <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
         <div className="field">
           <label htmlFor="lat">Latitude</label>
@@ -91,8 +93,8 @@ export function FindJoinNeighborhoodScreen() {
           <p className="muted">
             Residents inside this boundary can sign in and claim their house from the dashboard.
           </p>
-          <Link to={`/?neighborhood=${encodeURIComponent(neighborhood.id)}&lat=${neighborhood.centroid.lat}&lon=${neighborhood.centroid.lon}`}>View map</Link>{" "}
-          <Link to={`/dashboard?neighborhood=${encodeURIComponent(neighborhood.id)}&lat=${neighborhood.centroid.lat}&lon=${neighborhood.centroid.lon}`}>Associate my house</Link>
+          <Link to={`/?eventId=${encodeURIComponent(eventId)}&neighborhood=${encodeURIComponent(neighborhood.id)}&lat=${neighborhood.centroid.lat}&lon=${neighborhood.centroid.lon}`}>View map</Link>{" "}
+          <Link to={`/dashboard?eventId=${encodeURIComponent(eventId)}&neighborhood=${encodeURIComponent(neighborhood.id)}&lat=${neighborhood.centroid.lat}&lon=${neighborhood.centroid.lon}`}>Associate my house</Link>
         </div>
       ))}
     </div>

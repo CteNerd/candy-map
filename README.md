@@ -24,8 +24,14 @@ Approval remains self-reported/organizer-reviewed, not verified residency.
 
 Edition dates currently use the explicit launch-region timezone `America/Chicago`.
 Christmas 2026 runs November 1 through January 6 inclusive, including the January
-2027 portion. Live listings disappear when their edition ends. Archive consent,
-public house archives, nightly schedules, privacy removal/blocking, house invitations,
+2027 portion. Live listings disappear when their edition ends. The web app selects editions explicitly, preserves them in map/share/navigation
+links, changes holiday themes/icons/marker labels, and defaults to Christmas after
+Halloween. Residents can select among their own claimed houses, add another house,
+and explicitly save public or private participation for the selected edition.
+The year-round display name is currently Neighborhood Celebrations; deployment
+resource names remain unchanged.
+
+Archive consent, public house archives, nightly schedules, privacy removal/blocking, house invitations,
 community publication, and joint displays are not implemented yet.
 
 New participation records are keyed by edition. Year-keyed legacy records are read

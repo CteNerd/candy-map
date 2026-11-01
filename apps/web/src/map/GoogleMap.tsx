@@ -1,13 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import type { MapViewProps } from "./MapAdapter";
 import { GOOGLE_MAP_ID, loadGoogleLibrary } from "./googleMaps";
+import { EVENT_STATUS_LABELS } from "@candy-map/shared";
 
-const COLORS = { available: "#22c55e", low: "#f59e0b", finished: "#6b7280" };
+const COLORS = { available: "#22c55e", low: "#f59e0b", finished: "#6b7280", displaying: "#0f766e", paused: "#6b7280" };
+const THEMES = {
+  halloween: { boundary: "#7c3aed", draft: "#ff7a1a", icon: "🎃" },
+  "christmas-lights": { boundary: "#0f766e", draft: "#fbbf24", icon: "🎄" },
+};
 
 export function GoogleMap({
   center, boundary, pins, onPinClick, className, selectedPoint, userLocation,
-  draftPath, onMapClick, onCenterChange,
+  draftPath, onMapClick, onCenterChange, eventType,
 }: MapViewProps) {
+  const theme = THEMES[eventType ?? "halloween"];
   const container = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,23 +64,23 @@ export function GoogleMap({
     if (!map || !boundary) return;
     const polygon = new google.maps.Polygon({
       map, paths: boundary.map(([lng, lat]) => ({ lat: lat!, lng: lng! })),
-      strokeColor: "#7c3aed", strokeWeight: 2, fillColor: "#7c3aed", fillOpacity: 0.12,
+      strokeColor: theme.boundary, strokeWeight: 2, fillColor: theme.boundary, fillOpacity: 0.12,
       clickable: false,
     });
     return () => polygon.setMap(null);
-  }, [map, boundary]);
+  }, [map, boundary, theme]);
 
   useEffect(() => {
     if (!map || !draftPath?.length) return;
     const paths = draftPath.map((point) => ({ lat: point.lat, lng: point.lon }));
     const outline = draftPath.length >= 3
-      ? new google.maps.Polygon({ map, paths, strokeColor: "#ff7a1a", fillColor: "#ff7a1a", fillOpacity: 0.2, clickable: false })
-      : new google.maps.Polyline({ map, path: paths, strokeColor: "#ff7a1a", clickable: false });
+      ? new google.maps.Polygon({ map, paths, strokeColor: theme.draft, fillColor: theme.draft, fillOpacity: 0.2, clickable: false })
+      : new google.maps.Polyline({ map, path: paths, strokeColor: theme.draft, clickable: false });
     const vertices = paths.map((position, index) => new google.maps.marker.AdvancedMarkerElement({
       map, position, title: `Boundary corner ${index + 1}`,
     }));
     return () => { outline.setMap(null); vertices.forEach((marker) => { marker.map = null; }); };
-  }, [map, draftPath]);
+  }, [map, draftPath, theme]);
 
   useEffect(() => {
     if (!map) return;
@@ -82,16 +88,18 @@ export function GoogleMap({
       const button = document.createElement("button");
       button.className = "candy-marker";
       button.style.backgroundColor = COLORS[pin.status];
-      button.setAttribute("aria-label", `Candy house, status ${pin.status}`);
+      if (eventType) button.textContent = theme.icon;
+      const label = eventType ? `${eventType === "halloween" ? "Candy house" : "Christmas lights"}, ${EVENT_STATUS_LABELS[pin.status]}` : `Candy house, status ${pin.status}`;
+      button.setAttribute("aria-label", label);
       const marker = new google.maps.marker.AdvancedMarkerElement({
         map, position: { lat: pin.point.lat, lng: pin.point.lon }, content: button,
-        title: `Candy house: ${pin.status}`,
+        title: label,
       });
       button.addEventListener("click", () => onPinClick?.(pin.id));
       return marker;
     });
     return () => markers.forEach((marker) => { marker.map = null; });
-  }, [map, pins, onPinClick]);
+  }, [map, pins, onPinClick, eventType, theme]);
 
   useEffect(() => {
     if (!map || !selectedPoint) return;

@@ -1,25 +1,26 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { isPointInPolygon, type GeoPoint, type PublicNeighborhood, type PublicHousePin } from "@candy-map/shared";
+import { EVENT_STATUS_LABELS, isPointInPolygon, type GeoPoint, type PublicNeighborhood, type PublicEventPin } from "@candy-map/shared";
 import { fetchNeighborhoodHouses, fetchNeighborhoodsNear } from "../lib/api";
 import { formatRelativeTime } from "../lib/time";
 import { GoogleMap } from "../map/GoogleMap";
 import type { MapPin } from "../map/MapAdapter";
 import { AddressSearch } from "../map/AddressSearch";
 import { DEFAULT_CENTER, parsePoint, useLocation } from "../map/useLocation";
+import { useEventEdition } from "../lib/useEventEdition";
 
 const POLL_INTERVAL_MS = 20_000; // within the plan's 15-30s polling window
 
-const STATUS_LABEL: Record<PublicHousePin["status"], string> = {
-  available: "Available",
-  low: "Running low",
-  finished: "Finished",
-};
-
 export function NeighborhoodMapScreen() {
+  const { eventId } = useEventEdition();
+  return <NeighborhoodMapForEvent key={eventId} />;
+}
+
+function NeighborhoodMapForEvent() {
+  const { edition, eventId, lifecycle, eventError } = useEventEdition();
   const [searchParams] = useSearchParams();
   const [neighborhood, setNeighborhood] = useState<PublicNeighborhood | null>(null);
-  const [pins, setPins] = useState<PublicHousePin[]>([]);
+  const [pins, setPins] = useState<PublicEventPin[]>([]);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(() => new Date());
   const [shareCopied, setShareCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +57,7 @@ export function NeighborhoodMapScreen() {
     setNeighborhood(null);
     setPins([]);
     setSelectedPin(null);
+    if (eventError) return;
 
     async function load() {
       try {
@@ -71,7 +73,7 @@ export function NeighborhoodMapScreen() {
           setPins([]);
           return;
         }
-        const housePins = await fetchNeighborhoodHouses(first.id);
+        const housePins = await fetchNeighborhoodHouses(first.id, eventId);
         if (cancelled) return;
         setPins(housePins);
         setLastRefreshed(new Date());
@@ -90,7 +92,7 @@ export function NeighborhoodMapScreen() {
       clearInterval(interval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lookupPoint.lat, lookupPoint.lon, searchParams]);
+  }, [lookupPoint.lat, lookupPoint.lon, searchParams, eventId, eventError]);
 
   const mapPins: MapPin[] = useMemo(() => pins.map((pin) => ({ id: pin.id, point: pin.point, status: pin.status })), [pins]);
 
@@ -100,6 +102,7 @@ export function NeighborhoodMapScreen() {
     url.searchParams.set("lat", String(neighborhood.centroid.lat));
     url.searchParams.set("lon", String(neighborhood.centroid.lon));
     url.searchParams.set("neighborhood", neighborhood.id);
+    url.searchParams.set("eventId", eventId);
     try {
       await navigator.clipboard.writeText(url.toString());
       setShareCopied(true);
@@ -112,11 +115,16 @@ export function NeighborhoodMapScreen() {
   return (
     <div className="screen screen--map">
       <div className="map-toolbar">
+        <p className="event-summary"><strong>{edition.icon} {edition.label}</strong> · {lifecycle === "past" ? "Ended" : lifecycle === "upcoming" ? "Upcoming" : "Active"}</p>
+        {eventError && <p className="banner" role="alert">{eventError}</p>}
+        {!eventError && lifecycle === "past" && <p className="banner">This holiday has ended. Live listings are hidden. Public house archives are not available yet.</p>}
+        {!eventError && lifecycle === "upcoming" && <p className="banner">This holiday has not started. Residents can save their own edition-specific participation.</p>}
+        <p className="muted">Dates use {edition.timezone}. {edition.type === "christmas-lights" ? "November 1 through January 6. A listed display is not confirmation that lights are on now or an invitation onto private property." : "October 31. Only active candy updates appear."}</p>
         <AddressSearch onSelect={({ point }) => setLookupPoint(point)} />
         <div className="button-row">
           <button className="btn" onClick={locate} disabled={locating}>{locating ? "Locating..." : "Use my location"}</button>
           <button className="btn btn--secondary" onClick={() => setLookupPoint(areaCenter)}>Search this area</button>
-          <Link to="/neighborhoods/new" className="btn btn--secondary">Add neighborhood</Link>
+          <Link to={`/neighborhoods/new?eventId=${encodeURIComponent(eventId)}`} className="btn btn--secondary">Add neighborhood</Link>
         </div>
         {locationError && <p className="muted" role="alert">{locationError}</p>}
       </div>
@@ -127,19 +135,20 @@ export function NeighborhoodMapScreen() {
         userLocation={location}
         onPinClick={setSelectedPin}
         onCenterChange={selectArea}
+        eventType={edition.type}
       />
       <div className="card" style={{ margin: "0.75rem", borderRadius: "var(--radius)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.5rem" }}>
-          <strong>{neighborhood?.name ?? (loaded ? "No neighborhoods near this point" : "Loading neighborhood…")}</strong>
+          <strong>{neighborhood?.name ?? (eventError ? "Choose a supported holiday" : loaded ? "No neighborhoods near this point" : "Loading neighborhood…")}</strong>
           <button className="btn btn--secondary" onClick={onShare} disabled={!neighborhood} style={{ padding: "0.3rem 0.7rem", fontSize: "0.8rem" }}>
             {shareCopied ? "Copied!" : "Share"}
           </button>
         </div>
         {error && <p role="alert" className="muted">{error}</p>}
-        {neighborhood && <Link to={`/dashboard?neighborhood=${encodeURIComponent(neighborhood.id)}&lat=${lookupPoint.lat}&lon=${lookupPoint.lon}`}>Associate my house with {neighborhood.name}</Link>}
+        {neighborhood && <Link to={`/dashboard?eventId=${encodeURIComponent(eventId)}&neighborhood=${encodeURIComponent(neighborhood.id)}&lat=${lookupPoint.lat}&lon=${lookupPoint.lon}`}>Associate my house with {neighborhood.name}</Link>}
         {loaded && !neighborhood && !error && <p className="muted">Search your address or use your location, then add your neighborhood to get started.</p>}
         {selectedPin && pins.find((pin) => pin.id === selectedPin) && <p role="status">
-          Selected house: {STATUS_LABEL[pins.find((pin) => pin.id === selectedPin)!.status]}
+          Selected house: {EVENT_STATUS_LABELS[pins.find((pin) => pin.id === selectedPin)!.status]}
         </p>}
         <p className="muted">
           {pins.length} house{pins.length === 1 ? "" : "s"} opted in · refreshed {formatRelativeTime(lastRefreshed.toISOString())}
@@ -147,7 +156,7 @@ export function NeighborhoodMapScreen() {
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: "0.4rem" }}>
           {pins.map((pin) => (
             <li key={pin.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span className={`pill pill--${pin.status}`}>{STATUS_LABEL[pin.status]}</span>
+              <span className={`pill pill--${pin.status}`}>{EVENT_STATUS_LABELS[pin.status]}</span>
               <span className="muted">{formatRelativeTime(pin.updatedAt)}</span>
             </li>
           ))}

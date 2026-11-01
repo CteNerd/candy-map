@@ -39,6 +39,13 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals(); });
 
 describe("GoogleMap", () => {
+  it("uses Christmas graphics and accessible labels for Christmas listings", async () => {
+    render(<GoogleMap center={SEED_NEIGHBORHOOD.centroid} eventType="christmas-lights"
+      pins={[{ id: "lights", point: SEED_NEIGHBORHOOD.centroid, status: "displaying" }]} />);
+    await waitFor(() => expect(mocks.markers).toHaveLength(1));
+    expect(mocks.markers[0]?.content?.textContent).toBe("🎄");
+    expect(mocks.markers[0]?.content?.getAttribute("aria-label")).toBe("Christmas lights, Display listed");
+  });
   it("updates its center and renders the boundary and candy marker", async () => {
     const onPinClick = vi.fn();
     const props = {

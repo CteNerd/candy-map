@@ -7,7 +7,7 @@ describe("message link preview", () => {
   const document = new DOMParser().parseFromString(html, "text/html");
 
   it("provides title, description and large image without requiring JavaScript", () => {
-    expect(document.querySelector('meta[property="og:title"]')?.getAttribute("content")).toContain("Candy Map");
+    expect(document.querySelector('meta[property="og:title"]')?.getAttribute("content")).toContain("Neighborhood Celebrations");
     expect(document.querySelector('meta[property="og:description"]')?.getAttribute("content")).toContain("candy");
     expect(document.querySelector('meta[name="twitter:card"]')?.getAttribute("content")).toBe("summary_large_image");
     const image = document.querySelector('meta[property="og:image"]')?.getAttribute("content");

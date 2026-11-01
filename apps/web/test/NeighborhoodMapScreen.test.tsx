@@ -14,7 +14,7 @@ vi.mock("../src/lib/api", async () => {
     fetchNeighborhoodHouses: vi.fn().mockResolvedValue(SEED_HOUSE_PINS),
   };
 });
-import { fetchNeighborhoodsNear } from "../src/lib/api";
+import { fetchNeighborhoodHouses, fetchNeighborhoodsNear } from "../src/lib/api";
 
 import { NeighborhoodMapScreen } from "../src/screens/NeighborhoodMapScreen";
 
@@ -25,6 +25,17 @@ afterEach(() => {
 });
 
 describe("NeighborhoodMapScreen", () => {
+  it("requests the selected edition and preserves it in neighborhood navigation", async () => {
+    render(<MemoryRouter initialEntries={["/?eventId=christmas-lights-2026"]}><NeighborhoodMapScreen /></MemoryRouter>);
+    await waitFor(() => expect(fetchNeighborhoodHouses).toHaveBeenCalledWith("nbhd-maple-hollow", "christmas-lights-2026"));
+    expect(screen.getByRole("link", { name: /Associate my house/ })).toHaveAttribute("href", expect.stringContaining("eventId=christmas-lights-2026"));
+  });
+
+  it("shows an error for invalid editions without loading another event", async () => {
+    render(<MemoryRouter initialEntries={["/?eventId=invalid"]}><NeighborhoodMapScreen /></MemoryRouter>);
+    expect(await screen.findByRole("alert")).toHaveTextContent("not supported");
+    expect(fetchNeighborhoodHouses).not.toHaveBeenCalled();
+  });
   it("renders the seeded neighborhood name and opted-in house count", async () => {
     render(
       <MemoryRouter>

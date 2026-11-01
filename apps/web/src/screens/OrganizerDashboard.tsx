@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { approveClaim } from "../lib/api";
 import { Link, useSearchParams } from "react-router-dom";
+import { useEventEdition } from "../lib/useEventEdition";
 
 /**
  * Organizer claim approval is wired to the real `POST /admin/claims/{id}/approve` endpoint.
@@ -12,6 +13,7 @@ import { Link, useSearchParams } from "react-router-dom";
  * endpoint is tracked in TASKS.md Milestone 4 alongside the duplicate-neighborhood review queue.
  */
 export function OrganizerDashboard() {
+  const { eventId } = useEventEdition();
   const { user, isConfigured, signIn } = useAuth();
   const [params] = useSearchParams();
   const [claimId, setClaimId] = useState(params.get("claim") ?? "");
@@ -23,7 +25,7 @@ export function OrganizerDashboard() {
     return (
       <div className="screen">
         <h2>Organizer dashboard</h2>
-        <Link className="btn" to="/neighborhoods/new">Add neighborhood</Link>
+        <Link className="btn" to={`/neighborhoods/new?eventId=${encodeURIComponent(eventId)}`}>Add neighborhood</Link>
         <div className="banner">Sign-in isn't configured yet — see README "Environment variables".</div>
       </div>
     );
@@ -59,7 +61,7 @@ export function OrganizerDashboard() {
     <div className="screen">
       <h2>Organizer dashboard</h2>
       <div className="banner">
-        Duplicate-neighborhood overlap review and community-report moderation ship in Milestone 4.
+        Community sightings, privacy review, invitations, and joint displays are not enabled yet.
       </div>
       <form className="card" onSubmit={onApprove} style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
         <strong>Approve a claim</strong>

@@ -1,14 +1,62 @@
 :root {
-  color-scheme: light;
-  --color-bg: #0f0a1e;
-  --color-surface: #1c1333;
-  --color-accent: #ff7a1a;
-  --color-accent-2: #7c3aed;
-  --color-text: #f5f1ff;
-  --color-text-muted: #b9aee0;
-  --color-border: #342757;
+  color-scheme: dark;
+  --color-bg: #081b24;
+  --color-surface: #102c36;
+  --color-accent: #fcd34d;
+  --color-accent-2: #115e59;
+  --color-text: #f0fdfa;
+  --color-text-muted: #b8d5d6;
+  --color-border: #37616a;
   --radius: 14px;
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+[data-event="halloween"] {
+  --color-bg: #0f0a1e;
+  --color-surface: #1c1333;
+  --color-accent: #ffad66;
+  --color-accent-2: #6d28d9;
+  --color-text: #f5f1ff;
+  --color-text-muted: #b9aee0;
+  --color-border: #59477d;
+}
+
+.app-shell {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.event-selector {
+  min-width: 170px;
+  max-width: 240px;
+  font-size: 0.8rem;
+}
+
+.event-summary {
+  margin: 0 0 0.5rem;
+}
+
+.consent-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+  line-height: 1.5;
+}
+
+@media (max-width: 540px) {
+  .app-header {
+    flex-wrap: wrap;
+  }
+  .event-selector {
+    width: 100%;
+    max-width: none;
+  }
 }
 
 * {
@@ -160,8 +208,9 @@ gmp-place-autocomplete {
 }
 
 .candy-marker {
-  width: 28px;
-  height: 28px;
+  width: 44px;
+  height: 44px;
+  font-size: 22px;
   border: 3px solid white;
   border-radius: 50%;
   box-shadow: 0 2px 5px #0006;
@@ -182,7 +231,8 @@ gmp-place-autocomplete {
   cursor: not-allowed;
 }
 
-.btn.candy-status--available {
+.btn.candy-status--available,
+.btn.candy-status--displaying {
   background: #16a34a33;
   border-color: #4ade80;
   color: #4ade80;
@@ -194,7 +244,8 @@ gmp-place-autocomplete {
   color: #fbbf24;
 }
 
-.btn.candy-status--finished {
+.btn.candy-status--finished,
+.btn.candy-status--paused {
   background: #6b728033;
   border-color: #9ca3af;
   color: #d1d5db;
@@ -215,7 +266,8 @@ gmp-place-autocomplete {
   font-weight: 600;
 }
 
-.pill--available {
+.pill--available,
+.pill--displaying {
   background: #16a34a33;
   color: #4ade80;
 }
@@ -225,7 +277,8 @@ gmp-place-autocomplete {
   color: #fbbf24;
 }
 
-.pill--finished {
+.pill--finished,
+.pill--paused {
   background: #6b728033;
   color: #9ca3af;
 }
@@ -241,7 +294,7 @@ gmp-place-autocomplete {
   padding: 0.6rem 0.7rem;
   border-radius: 10px;
   border: 1px solid var(--color-border);
-  background: #140d26;
+  background: var(--color-bg);
   color: var(--color-text);
 }
 
@@ -250,7 +303,7 @@ gmp-place-autocomplete {
   border-radius: 10px;
   border: none;
   background: var(--color-accent);
-  color: #1c1333;
+  color: #081b24;
   font-weight: 700;
   cursor: pointer;
 }
@@ -267,7 +320,7 @@ gmp-place-autocomplete {
 }
 
 .banner {
-  background: #342757;
+  background: var(--color-accent-2);
   border-radius: var(--radius);
   padding: 0.75rem;
   font-size: 0.85rem;

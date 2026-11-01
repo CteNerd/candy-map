@@ -1,5 +1,6 @@
 /** Local fixtures are used only when no live API is configured. */
-import type { CandyParticipation, CandyStatus, House, HouseClaim, MyHouseClaim, Neighborhood, PolygonGeoJSON, PublicNeighborhood, PublicHousePin } from "@candy-map/shared";
+import type { CandyParticipation, CandyStatus, EventParticipation, EventStatus, House, HouseClaim, MyHouseClaim, Neighborhood, PolygonGeoJSON, PublicNeighborhood, PublicHousePin, PublicEventPin } from "@candy-map/shared";
+import { getEventEdition, getEventLifecycle } from "@candy-map/shared";
 import { SEED_HOUSE_PINS, SEED_NEIGHBORHOOD } from "./fixtures";
 import { getIdToken } from "../auth/cognito";
 
@@ -29,7 +30,17 @@ export async function fetchNeighborhoodsNear(lat: number, lon: number): Promise<
   return fetchJson<PublicNeighborhood[]>(`/neighborhoods?lat=${lat}&lon=${lon}`);
 }
 
-export async function fetchNeighborhoodHouses(neighborhoodId: string): Promise<PublicHousePin[]> {
+export async function fetchNeighborhoodHouses(neighborhoodId: string): Promise<PublicHousePin[]>;
+export async function fetchNeighborhoodHouses(neighborhoodId: string, eventId: string): Promise<PublicEventPin[]>;
+export async function fetchNeighborhoodHouses(neighborhoodId: string, eventId?: string): Promise<PublicEventPin[]> {
+  if (eventId !== undefined) {
+    const edition = getEventEdition(eventId);
+    if (!edition) throw new Error("Unsupported event edition.");
+    if (!API_BASE_URL) {
+      return edition.type === "halloween" && getEventLifecycle(edition) === "active" ? SEED_HOUSE_PINS : [];
+    }
+    return fetchJson<PublicEventPin[]>(`/neighborhoods/${neighborhoodId}/houses?eventId=${encodeURIComponent(eventId)}`);
+  }
   if (!API_BASE_URL) return SEED_HOUSE_PINS;
   return fetchJson<PublicHousePin[]>(`/neighborhoods/${neighborhoodId}/houses`);
 }
@@ -85,8 +96,14 @@ export function toggleCandyStatus(
   return authenticatedFetch(`/houses/${houseId}/candy`, { method: "PATCH", body: JSON.stringify(body) });
 }
 
-export function fetchMyClaims(): Promise<MyHouseClaim[]> {
-  return authenticatedFetch("/me/claims");
+export function fetchMyClaims(eventId?: string): Promise<MyHouseClaim[]> {
+  return authenticatedFetch(`/me/claims${eventId === undefined ? "" : `?eventId=${encodeURIComponent(eventId)}`}`);
+}
+
+export function updateEventParticipation(houseId: string, eventId: string, body: { status: EventStatus; publicOptIn: boolean }): Promise<EventParticipation> {
+  return authenticatedFetch(`/houses/${encodeURIComponent(houseId)}/events/${encodeURIComponent(eventId)}`, {
+    method: "PATCH", body: JSON.stringify(body),
+  });
 }
 
 export function approveClaim(claimId: string): Promise<HouseClaim> {

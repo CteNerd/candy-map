@@ -6,8 +6,10 @@ import { createNeighborhood, isLiveApiConfigured } from "../lib/api";
 import { GoogleMap } from "../map/GoogleMap";
 import { AddressSearch } from "../map/AddressSearch";
 import { DEFAULT_CENTER, useLocation } from "../map/useLocation";
+import { useEventEdition } from "../lib/useEventEdition";
 
 export function CreateNeighborhoodScreen() {
+  const { edition, eventId } = useEventEdition();
   const { user, isConfigured, signIn } = useAuth();
   const [name, setName] = useState("");
   const [center, setCenter] = useState(DEFAULT_CENTER);
@@ -53,7 +55,7 @@ export function CreateNeighborhoodScreen() {
     <button className="btn" onClick={signIn}>Sign in</button>
   </div>;
   if (created) {
-    const query = `neighborhood=${encodeURIComponent(created.id)}&lat=${created.centroid.lat}&lon=${created.centroid.lon}`;
+    const query = `eventId=${encodeURIComponent(eventId)}&neighborhood=${encodeURIComponent(created.id)}&lat=${created.centroid.lat}&lon=${created.centroid.lon}`;
     return <div className="screen">
       <h2>{created.name} created</h2>
       <p role="status">{created.status === "pending_review"
@@ -63,7 +65,7 @@ export function CreateNeighborhoodScreen() {
         <Link className="btn" to={`/dashboard?${query}`}>Associate my house</Link>
         <Link to={`/?${query}`}>View neighborhood map</Link>
       </>}
-      {created.status !== "active" && <Link to="/organizer">Organizer dashboard</Link>}
+      {created.status !== "active" && <Link to={`/organizer?eventId=${encodeURIComponent(eventId)}`}>Organizer dashboard</Link>}
     </div>;
   }
   return <div className="screen">
@@ -76,7 +78,7 @@ export function CreateNeighborhoodScreen() {
       <button className="btn btn--secondary" onClick={() => setVertices([])} disabled={busy || !vertices.length}>Clear boundary</button>
     </div>
     {locationError && <p role="alert">{locationError}</p>}
-    <GoogleMap center={center} pins={[]} draftPath={vertices} userLocation={location}
+    <GoogleMap center={center} pins={[]} draftPath={vertices} userLocation={location} eventType={edition.type}
       onMapClick={busy ? undefined : (point) => setVertices((points) => [...points, point])} className="map-editor" />
     <p className="muted" role="status">{vertices.length} boundary corners selected</p>
     <form className="card" onSubmit={submit}>

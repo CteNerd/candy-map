@@ -1,13 +1,14 @@
 /** Provider-independent map inputs; domain coordinates remain [longitude, latitude]. */
-import type { GeoPoint, CandyStatus } from "@candy-map/shared";
+import type { GeoPoint, EventStatus, EventType } from "@candy-map/shared";
 
 export interface MapPin {
   id: string;
   point: GeoPoint;
-  status: CandyStatus;
+  status: EventStatus;
 }
 
 export interface MapViewProps {
+  eventType?: EventType;
   /** [lon, lat] outer ring of the neighborhood boundary to outline. */
   boundary?: number[][];
   center: GeoPoint;

@@ -7,6 +7,21 @@ afterEach(() => {
 });
 
 describe("public API deployment modes", () => {
+  it("keeps Christmas fixture mode empty rather than copying Halloween houses", async () => {
+    vi.stubEnv("VITE_API_BASE_URL", "");
+    const { fetchNeighborhoodHouses } = await import("../src/lib/api");
+    expect(await fetchNeighborhoodHouses("demo", "christmas-lights-2026")).toEqual([]);
+  });
+
+  it("passes the selected edition to the live public endpoint", async () => {
+    vi.stubEnv("VITE_API_BASE_URL", "https://api.example.com");
+    vi.stubEnv("DEV", false);
+    const fetch = vi.fn().mockResolvedValue(new Response("[]", { status: 200 }));
+    vi.stubGlobal("fetch", fetch);
+    const { fetchNeighborhoodHouses } = await import("../src/lib/api");
+    await fetchNeighborhoodHouses("n1", "christmas-lights-2026");
+    expect(fetch).toHaveBeenCalledWith("https://api.example.com/neighborhoods/n1/houses?eventId=christmas-lights-2026", expect.anything());
+  });
   it("uses fixtures only when no live API is configured", async () => {
     vi.stubEnv("VITE_API_BASE_URL", "");
     const { fetchNeighborhoodsNear } = await import("../src/lib/api");
