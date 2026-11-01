@@ -51,6 +51,13 @@ pending. SES sender verification and regional production access are prerequisite
 for invitation email; a verified sender alone does not enable an email feature.
 Keep sender addresses and account assignments out of source control.
 
+For approved one-time reviewer setup, supply `AWS_PROFILE`, `AWS_ACCOUNT_ID`,
+`AWS_REGION`, `COGNITO_USER_POOL_ID`, and `REVIEWER_EMAIL` privately as environment
+variables. Run `node scripts/setup-privacy-reviewer.mjs` to validate the matching
+verified account and deployed group, then add `--assign` to explicitly grant and
+verify membership. The command never creates users/groups or grants AWS roles,
+and it checks that the user pool belongs to `CandyMapStack`.
+
 ## Architecture
 
 ```

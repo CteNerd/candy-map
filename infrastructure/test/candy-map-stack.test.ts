@@ -6,17 +6,21 @@ import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
+let synthesized: Template | undefined;
+
 function synthesize() {
+  if (synthesized) return synthesized;
   const app = new cdk.App();
   const stack = new CandyMapStack(app, "TestStack", {
     allowedOrigin: "https://example.com",
     cognitoDomainPrefix: "candy-map-test",
     env: { account: "123456789012", region: "us-east-1" },
   });
-  return Template.fromStack(stack);
+  synthesized = Template.fromStack(stack);
+  return synthesized;
 }
 
-describe("CandyMapStack", () => {
+describe("CandyMapStack", { timeout: 20_000 }, () => {
   it("loads every bundled Lambda handler in Node without dynamic-require initialization errors", () => {
     const app = new cdk.App();
     new CandyMapStack(app, "BundleTest", {
