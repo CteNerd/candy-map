@@ -8,6 +8,14 @@ main for the existing verification/deployment workflow.
 - Christmas 2026 runs November 1, 2026 through January 6, 2027, inclusive.
 - Removal requests hide matched listings pending private manual review; durable
   preemptive requests also have a manual-review path.
+- Privacy moderation uses a dedicated, manually assigned reviewer group, separate
+  from neighborhood organizers. Membership can be expanded as operations grow.
+- After API acceptance, removal must apply to subsequent public reads immediately
+  and to open maps within 30 seconds. Already downloaded data cannot be recalled.
+- Detailed resolved privacy requests are retained for 90 days; minimal suppression
+  records remain until explicitly lifted.
+- House collaboration uses manager/editor roles and expiring invitation links,
+  with optional edition-specific access and no cross-house inheritance.
 - New original holiday artwork, event-specific icons/emoji, markers, favicon,
   sharing metadata, and themes are part of the styling work.
 - House invitations, access requests, and joint displays are in implementation
@@ -27,9 +35,10 @@ main for the existing verification/deployment workflow.
 - Holiday UI release: year-round display name, explicit edition selector, event
   links, Christmas/Halloween themes and markers, neutral favicon, new generated
   social artwork, explicit publication controls, and a private multi-house selector.
-- Plan and event API increments passed GitHub verification and deployment.
-  The UI increment passed build/tests/lint and a 390x844 browser check, including
-  event switching without horizontal overflow. Full resident collaboration,
+- Plan, event API, and holiday UI increments passed GitHub verification and
+  deployment. The UI increment passed build, 166 tests, lint (one existing
+  fast-refresh warning), and a 390x844 browser check, including event switching
+  without horizontal overflow. Full resident collaboration,
   privacy workflows, historical publication, and joint displays remain pending.
 
 ## Goals and agreed defaults
@@ -377,11 +386,15 @@ build, typecheck, lint, and full tests before release.
 ## Decisions still needed before implementation
 
 1. Christmas display dates and regional timezone policy.
-2. Practical low-data residency/property-authority verification and privacy-review
-   staffing, escalation, and appeal policy.
-3. Exact retention periods, small-count thresholds, and removal propagation target.
+2. Practical low-data residency/property-authority verification, reviewer account
+   provisioning, escalation, and appeal policy. The dedicated reviewer-group model
+   and manual-review MVP are approved.
+3. Small-count archive thresholds and deletion/backup procedures. Resolved-request
+   retention is 90 days, suppression lasts until explicitly lifted, and the
+   open-map removal target is 30 seconds.
 4. Unit/building blocking scope and a safe process for legitimate authority changes.
 5. Final year-round name and visual direction; these can be chosen after wireframes.
-6. Confirm manager/editor permissions, transfer/recovery rules, and invitation
-   delivery method before implementing collaboration. Joint displays are deferred
-   by recommendation; they are not a prerequisite for Christmas.
+6. Finalize management transfer/recovery rules and invitation delivery details.
+   Manager/editor roles and expiring invitation links are approved. Joint displays
+   are included after collaboration/privacy, not a prerequisite for the initial
+   holiday release.
