@@ -42,6 +42,15 @@ compatibility stage; existing records are not rewritten or enrolled in new holid
 Exact map coordinates identify properties even though names and address labels
 are omitted; the public map is not anonymous.
 
+The infrastructure defines a `privacy-reviewers` Cognito group. Membership must be
+assigned manually to a confirmed app account using approved one-time setup
+permissions, not inferred from house claims or neighborhood organizer roles.
+Group members must sign out and back in to refresh their token after assignment.
+The group alone does not enable privacy-review endpoints: those workflows remain
+pending. SES sender verification and regional production access are prerequisites
+for invitation email; a verified sender alone does not enable an email feature.
+Keep sender addresses and account assignments out of source control.
+
 ## Architecture
 
 ```

@@ -56,6 +56,12 @@ export class CandyMapStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
+    new cognito.CfnUserPoolGroup(this, "PrivacyReviewersGroup", {
+      userPoolId: userPool.userPoolId,
+      groupName: "privacy-reviewers",
+      description: "Manually assigned reviewers for property privacy requests and disputed authority.",
+    });
+
     // Cognito rejects "*" as a callback URL, so the wildcard POC default only gets a localhost
     // callback — set a real `allowedOrigin` context value to get a working hosted-UI redirect.
     const callbackUrls = [

@@ -69,6 +69,15 @@ describe("CandyMapStack", () => {
     template.hasResourceProperties("AWS::Cognito::UserPool", { DeletionProtection: "ACTIVE" });
   });
 
+  it("defines a dedicated privacy-reviewer group without automatically assigning users", () => {
+    const template = synthesize();
+    template.resourceCountIs("AWS::Cognito::UserPoolGroup", 1);
+    template.hasResourceProperties("AWS::Cognito::UserPoolGroup", {
+      GroupName: "privacy-reviewers",
+    });
+    template.resourceCountIs("AWS::Cognito::UserPoolUserToGroupAttachment", 0);
+  });
+
   it("creates one Lambda function per public + authenticated handler (10 total)", () => {
     const template = synthesize();
     template.resourceCountIs("AWS::Lambda::Function", 10);
