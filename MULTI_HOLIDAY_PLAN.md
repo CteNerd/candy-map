@@ -65,8 +65,15 @@ main for the existing verification/deployment workflow.
 - Home page explains participation and privacy. Resident/organizer worklists use
   readable house/neighborhood labels; authorized organizers can rename a
   neighborhood without changing its boundary, houses, or membership.
-- These current changes are awaiting release verification and deployment.
-  Community sightings, historical publication, additional holiday types, and
+- Privacy/household/home release `8b82d34` passed build, 218 tests, lint (one
+  existing fast-refresh warning), and [GitHub verification and deployment](https://github.com/CteNerd/candy-map/actions/runs/41322388150).
+  Deployed home/privacy screens have no horizontal overflow at 390px; artwork
+  loads and fresh navigation produces no runtime errors. Public invalid privacy
+  intake returns 400 without writing a hold; signed-out private queue, household,
+  and organizer requests return 401. A missing invitation token is shown as an
+  explicit error. Production inbox delivery and authenticated acceptance still
+  need confirmation with a real household invitation.
+- Community sightings, historical publication, additional holiday types, and
   joint displays remain pending.
 
 ## Goals and agreed defaults
